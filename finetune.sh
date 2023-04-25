@@ -1,4 +1,4 @@
-TOT_CUDA="1"
+TOT_CUDA="0,1,2,3"
 CUDAs=(${TOT_CUDA//,/ })
 echo "CUDAs: $CUDAs"
 CUDA_NUM=${#CUDAs[@]}
