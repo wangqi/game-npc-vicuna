@@ -15,7 +15,7 @@ from transformers import LlamaTokenizer, LlamaForCausalLM, GenerationConfig
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--model_path", type=str, default="decapoda-research/llama-7b-hf")
-parser.add_argument("--lora_path", type=str, default="./lora-out/checkpoint-3000")
+parser.add_argument("--lora_path", type=str, default="./lora-out/final")
 parser.add_argument("--use_typewriter", type=int, default=1)
 parser.add_argument("--share_link", type=int, default=0)
 parser.add_argument("--use_local", type=int, default=1)
@@ -211,7 +211,7 @@ def evaluate(
     generation_config = GenerationConfig(
         temperature=temperature,
         top_p=top_p,
-        top_k=top_k,
+        op_k=top_k,
         num_beams=num_beams,
         bos_token_id=1,
         eos_token_id=2,

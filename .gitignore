@@ -163,3 +163,4 @@ cython_debug/
 samples/**
 loras/**
 lora_out/**
+models/**
