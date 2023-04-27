@@ -1,6 +1,8 @@
-BASE_MODEL="decapoda-research/llama-7b-hf"
+BASE_MODEL="models/game_npc_vicuna_base"
 LORA_PATH="lora_out/final"
 LORA_TOKEN="config"
 MODEL_PATH="models/game_npc_vicuna"
 
-python tools/merge.py --base_model $BASE_MODEL --lora_model $LORA_PATH --lora_token $LORA_TOKEN --output_dir $MODEL_PATH
+echo "Merge the game_npc_vicuna_base model with game npc fine-tuned lora under $LORA_PATH"
+CUDA_VISIBLE_DEVICES=0 python tools/merge.py --base_model $BASE_MODEL --lora_model $LORA_PATH \
+ --lora_token $LORA_TOKEN --output_dir $MODEL_PATH

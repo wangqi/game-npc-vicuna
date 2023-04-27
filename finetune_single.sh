@@ -12,3 +12,7 @@ python tools/finetune.py \
 --save_steps 200 \
 --resume_from_checkpoint $lora_checkpoint \
 --ignore_data_skip $from_data_beginning
+
+mkdir -p $OUTPUT_PATH/final/
+cp adapter_config.json $OUTPUT_PATH/final/
+cp adapter_model.bin $OUTPUT_PATH/final/

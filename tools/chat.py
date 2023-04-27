@@ -63,30 +63,30 @@ if device == "cuda":
         torch_dtype=torch.float16,
         device_map={"": 0},
     )
-    model = SteamGenerationMixin.from_pretrained(
-        model, LORA_WEIGHTS, torch_dtype=torch.float16, device_map={"": 0}
-    )
+    # model = SteamGenerationMixin.from_pretrained(
+    #     model, LORA_WEIGHTS, torch_dtype=torch.float16, device_map={"": 0}
+    # )
 elif device == "mps":
     model = LlamaForCausalLM.from_pretrained(
         BASE_MODEL,
         device_map={"": device},
         torch_dtype=torch.float16,
     )
-    model = SteamGenerationMixin.from_pretrained(
-        model,
-        LORA_WEIGHTS,
-        device_map={"": device},
-        torch_dtype=torch.float16,
-    )
+    # model = SteamGenerationMixin.from_pretrained(
+    #     model,
+    #     LORA_WEIGHTS,
+    #     device_map={"": device},
+    #     torch_dtype=torch.float16,
+    # )
 else:
     model = LlamaForCausalLM.from_pretrained(
         BASE_MODEL, device_map={"": device}, low_cpu_mem_usage=True
     )
-    model = SteamGenerationMixin.from_pretrained(
-        model,
-        LORA_WEIGHTS,
-        device_map={"": device},
-    )
+    # model = SteamGenerationMixin.from_pretrained(
+    #     model,
+    #     LORA_WEIGHTS,
+    #     device_map={"": device},
+    # )
 
 def generate_prompt_and_tokenize0(data_point, maxlen):
     # cutoff the history to avoid exceeding length limit
@@ -203,11 +203,11 @@ def evaluate(
         'history': history,
         'input': inputs,
     }
-    printf(data_point)
+    print(data_point)
     input_ids = PROMPT_DICT['preprocess'](data_point, max_memory)
-    printf('>>> input prompts:', tokenizer.decode(input_ids))
+    print('>>> input prompts:', tokenizer.decode(input_ids))
     input_ids = torch.tensor([input_ids]).to(device) # batch=1
-    printf(input_ids.shape)
+    print(input_ids.shape)
     generation_config = GenerationConfig(
         temperature=temperature,
         top_p=top_p,
@@ -281,6 +281,7 @@ def evaluate(
                     'input': inputs,
                     'output': output,
                 })
+                print("output: ", output)
                 return_text += [(inputs, output)]
                 yield return_text, history
             except torch.cuda.OutOfMemoryError:
@@ -291,7 +292,6 @@ def evaluate(
                 printf(show_text)
                 return_text += [(inputs, show_text)]
                 yield return_text, history
-
 
 
 # gr.Interface对chatbot的clear有bug，因此我们重新实现了一个基于gr.block的UI逻辑
@@ -312,7 +312,7 @@ with gr.Blocks() as demo:
             input_component_column = gr.Column()
             with input_component_column:
                 input = gr.components.Textbox(
-                    lines=2, label="Input", placeholder="欢迎来到塔拉大陆>"
+                    lines=2, label="Input", placeholder=">"
                 )
                 temperature = gr.components.Slider(minimum=0, maximum=1, value=1.0, label="Temperature")
                 topp = gr.components.Slider(minimum=0, maximum=1, value=0.9, label="Top p")
@@ -424,4 +424,4 @@ with gr.Blocks() as demo:
         )
         clear_history.click(lambda: (None, None), None, [history, chatbot], queue=False)
 
-demo.queue().launch(share=args.share_link!=0, inbrowser=True)
+demo.queue().launch(share=args.share_link!=0, inbrowser=False)

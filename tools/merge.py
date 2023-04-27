@@ -30,7 +30,7 @@ assert (
 BASE_MODEL = args.base_model
 LORA_MODEL = args.lora_model
 LOAD_8BIT = False
-output_dir = args.output_dir
+OUTPUT_DIR = args.output_dir
 
 assert (
     BASE_MODEL
@@ -43,7 +43,7 @@ else:
 
 print("device: ", device)
 
-tokenizer = LlamaTokenizer.from_pretrained(args.lora_token)
+tokenizer = LlamaTokenizer.from_pretrained(BASE_MODEL)
 if device == "cuda":
     base_model = LlamaForCausalLM.from_pretrained(
         BASE_MODEL,
@@ -75,7 +75,7 @@ else:
 
 base_model.resize_token_embeddings(len(tokenizer))
 assert base_model.get_input_embeddings().weight.size(0) == len(tokenizer)
-tokenizer.save_pretrained(output_dir)
+tokenizer.save_pretrained(OUTPUT_DIR)
 print(f"Extended vocabulary size: {len(tokenizer)}")
 
 first_weight = base_model.model.layers[0].self_attn.q_proj.weight
@@ -133,5 +133,5 @@ deloreanized_sd = {
     if "lora" not in k
 }
 LlamaForCausalLM.save_pretrained(
-    base_model, output_dir, state_dict=deloreanized_sd
+    base_model, OUTPUT_DIR, state_dict=deloreanized_sd
 )

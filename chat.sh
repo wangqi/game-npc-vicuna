@@ -1,10 +1,12 @@
-BASE_MODEL="decapoda-research/llama-7b-hf" #"/model/13B_hf"
+#BASE_MODEL="decapoda-research/llama-7b-hf" #"/model/13B_hf"
+BASE_MODEL="models/game_npc_vicuna"
 LORA_PATH="lora_out/final" #"checkpoint-6000"
 USE_LOCAL=1 # 1: use local model, 0: use huggingface model
 DEBUG=0
 if [[ USE_LOCAL -eq 1 ]]
-  echo "Use local LORA: $LORA_PATH"
 then
+  echo "Use local LORA: $LORA_PATH"
+else
   echo "Use Remote LORA in Huggingface: $LORA_PATH"
 fi
 
