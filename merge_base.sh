@@ -1,5 +1,5 @@
 BASE_MODEL="decapoda-research/llama-7b-hf"
-LORA_PATH="loras/Chinese-Vicuna-lora-7b-belle-and-guanaco"
+LORA_PATH="Facico/Chinese-Vicuna-lora-7b-3epoch-belle-and-guanaco"
 LORA_TOKEN="config"
 MODEL_PATH="models/game_npc_vicuna_base"
 

@@ -304,7 +304,7 @@ with gr.Blocks() as demo:
         + "</h1>"
     )
     description = gr.Markdown(
-        "NPC基于Chinese-Vicuna的代码训练而来，底层模型基于开源的llama7B"
+        "加载模型文件:" + BASE_MODEL
     )
     history = gr.components.State()
     with gr.Row().style(equal_height=False):

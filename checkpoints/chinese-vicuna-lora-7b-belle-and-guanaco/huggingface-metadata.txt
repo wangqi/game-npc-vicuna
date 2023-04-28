@@ -1,0 +1,12 @@
+url: https://huggingface.co/Chinese-Vicuna/Chinese-Vicuna-lora-7b-belle-and-guanaco
+branch: main
+download date: 2023-04-27 20:34:28
+sha256sum:
+    cd27e3e822af21deaa693661a25492e873a5ffc3f8a4784b68fca4bd1d0f5c5c adapter_model.bin
+    40197f63cca775f811dafe7658f5fc9bcbb14d97d0c83487b3b8276c302ee8ee optimizer.pt
+    4846889948e0f7c654e3123f52affd0cab98fbd7c06fd4d9474122e65299d249 pytorch_model.bin
+    2c5f74232649af84403eb5b89cad3f6def7a71298e4164a94e61a5d8caf8ae63 rng_state_0.pth
+    f3b9eb73721d0e73578b43e2b00e9031eb1fd07f922a216684ed259220f55328 rng_state_1.pth
+    24fb2a2e8d726bc63197adc145d6da58fdb525a71ab6ac6636d5ccee2e81e1bd rng_state_2.pth
+    14ac1afc84e5f0480f3391442c405f68f2e3181689bcd4c6426a7434fec883ca scaler.pt
+    2faa5448bd61662e1ae6f60aaaf946f04bc5474bc7e4a286c3b510f884c5e11a scheduler.pt
