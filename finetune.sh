@@ -7,7 +7,7 @@ PORT="12345"
 DATA_PATH="./data/data.json" #"../dataset/instruction/guanaco_non_chat_mini_52K-utf8.json"
 OUTPUT_PATH="lora_out"
 MODEL_PATH="decapoda-research/llama-7b-hf"
-lora_checkpoint="./checkpoints/checkpoint-11600"
+lora_checkpoint="./checkpoints/chinese-vicuna-lora-7b-belle-and-guanaco"
 from_data_beginning=False
 TEST_SIZE=100
 

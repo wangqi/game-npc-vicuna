@@ -63,30 +63,30 @@ if device == "cuda":
         torch_dtype=torch.float16,
         device_map={"": 0},
     )
-    # model = SteamGenerationMixin.from_pretrained(
-    #     model, LORA_WEIGHTS, torch_dtype=torch.float16, device_map={"": 0}
-    # )
+    model = SteamGenerationMixin.from_pretrained(
+        model, LORA_WEIGHTS, torch_dtype=torch.float16, device_map={"": 0}
+    )
 elif device == "mps":
     model = LlamaForCausalLM.from_pretrained(
         BASE_MODEL,
         device_map={"": device},
         torch_dtype=torch.float16,
     )
-    # model = SteamGenerationMixin.from_pretrained(
-    #     model,
-    #     LORA_WEIGHTS,
-    #     device_map={"": device},
-    #     torch_dtype=torch.float16,
-    # )
+    model = SteamGenerationMixin.from_pretrained(
+        model,
+        LORA_WEIGHTS,
+        device_map={"": device},
+        torch_dtype=torch.float16,
+    )
 else:
     model = LlamaForCausalLM.from_pretrained(
         BASE_MODEL, device_map={"": device}, low_cpu_mem_usage=True
     )
-    # model = SteamGenerationMixin.from_pretrained(
-    #     model,
-    #     LORA_WEIGHTS,
-    #     device_map={"": device},
-    # )
+    model = SteamGenerationMixin.from_pretrained(
+        model,
+        LORA_WEIGHTS,
+        device_map={"": device},
+    )
 
 def generate_prompt_and_tokenize0(data_point, maxlen):
     # cutoff the history to avoid exceeding length limit
@@ -106,28 +106,23 @@ def generate_prompt_and_tokenize0(data_point, maxlen):
     input_ids = init_ids + history_ids + input_ids
     return input_ids
 
-def postprocess0(text, render=True):
-    # clip user
-    text = text.split("### Assistant:")[1].strip()
-    text = text.replace('�','').replace("Belle", "Vicuna")
-    return text
-
 def generate_prompt_and_tokenize1(data_point, maxlen):
-    input_prompt = "\n".join(["User:" + i['input']+"\n"+"Assistant:" + i['output'] for i in data_point['history']]) + "\nUser:" + data_point['input'] + "\nAssistant:"
+    input_prompt = "\n".join(["猎人队长:" + i['input']+"\n"+"奥莉薇娅:" + i['output'] for i in data_point['history']]) + \
+                   "\n猎人队长:" + data_point['input'] + "\n奥莉薇娅:"
     input_prompt = input_prompt[-maxlen:]
     input_prompt = PROMPT_DICT['prompt'].format_map({'input':input_prompt})
     input_ids = tokenizer(input_prompt)["input_ids"]
     return input_ids
 
-def postprocess1(text, render=True):
+def postprocess(text, render=True):
     output = text.split("### Response:")[1].strip()
-    output = output.replace("Belle", "Vicuna")
+    output = output.replace("奥莉薇娅: ", "")
     printf('>>> output:', output)
     if '###' in output:
         output = output.split("###")[0]
-    if 'User' in output:
-        output = output.split("User")[0]
-    output = output.replace('�','') 
+    if '猎人队长' in output:
+        output = output.split("猎人队长")[0]
+    # output = output.replace('�','')
     if render:
         # fix gradio chatbot markdown code render bug
         lines = output.split("\n")
@@ -144,32 +139,18 @@ def postprocess1(text, render=True):
         # output = output.replace('<br/><pre>','\n<pre>') work for html; but not for gradio
     return output
 
-PROMPT_DICT0 = {
+PROMPT_DICT = {
     'prompt': (
-        "The following is a conversation between an AI assistant called Assistant and a human user called User."
-        "Assistant is is intelligent, knowledgeable, wise and polite.\n\n"
-    ),
-    'history': (
-        "User:{input}\n\nAssistant:{output}\n\n"
-    ),
-    'input': (
-        "User:{input}\n\n### Assistant:"
-    ),
-    'preprocess': generate_prompt_and_tokenize0,
-    'postprocess': postprocess0,
-}
-PROMPT_DICT1 = {
-    'prompt': (
-        "The following is a conversation between an AI assistant called Assistant and a human user called User.\n\n"
-        "### Instruction:\n{input}\n\n### Response:"
+        "你的名字是'奥莉薇娅'，今年23岁，是一名少女猎人。和你对话的人是猎人队长，你是他的导师和大姐姐。"
+        "请你以奥莉薇娅的身份进行对话\n"
+        "{input}\n\n### Response:"
     ),
     'preprocess': generate_prompt_and_tokenize1,
-    'postprocess': postprocess1,
+    'postprocess': postprocess,
 }
-PROMPT_DICT = None
 
-if not LOAD_8BIT:
-    model.half()  # seems to fix bugs for some users.
+# if not LOAD_8BIT:
+#     model.half()  # seems to fix bugs for some users.
 
 model.eval()
 if torch.__version__ >= "2" and sys.platform != "win32":
@@ -190,14 +171,6 @@ def evaluate(
     prompt_type='0',
     **kwargs,
 ):
-    global PROMPT_DICT
-    if prompt_type == '0':
-        PROMPT_DICT = PROMPT_DICT0
-    elif prompt_type == '1':
-        PROMPT_DICT = PROMPT_DICT1
-    else:
-        raise Exception('not support')
-    
     history = [] if history is None else history
     data_point = {
         'history': history,
@@ -304,7 +277,7 @@ with gr.Blocks() as demo:
         + "</h1>"
     )
     description = gr.Markdown(
-        "加载模型文件:" + BASE_MODEL
+        "加载模型文件:" + BASE_MODEL + "\n加载Lora:" + LORA_WEIGHTS
     )
     history = gr.components.State()
     with gr.Row().style(equal_height=False):
@@ -331,14 +304,10 @@ with gr.Blocks() as demo:
                     minimum=0, maximum=2048, step=1, value=256, label="Max Memory"
                 )
                 do_sample = gr.components.Checkbox(label="Use sample")
-                # must be str, not number !
-                type_of_prompt = gr.components.Dropdown(
-                    ['0', '1'], value='1', label="Prompt Type", info="select the specific prompt; use after clear history"
-                )
                 input_components = [
-                    input, history, temperature, topp, topk, beam_number, max_new_token, min_new_token, repeat_penal, max_memory, do_sample, type_of_prompt
+                    input, history, temperature, topp, topk, beam_number, max_new_token, min_new_token, repeat_penal, max_memory, do_sample
                 ]
-                input_components_except_states = [input, temperature, topp, topk, beam_number, max_new_token, min_new_token, repeat_penal, max_memory, do_sample, type_of_prompt]
+                input_components_except_states = [input, temperature, topp, topk, beam_number, max_new_token, min_new_token, repeat_penal, max_memory, do_sample]
             with gr.Row():
                 cancel_btn = gr.Button('Cancel')
                 submit_btn = gr.Button("Submit", variant="primary")
