@@ -20,6 +20,7 @@ parser.add_argument("--use_typewriter", type=int, default=1)
 parser.add_argument("--share_link", type=int, default=0)
 parser.add_argument("--use_local", type=int, default=1)
 parser.add_argument("--force_cpu", action='store_true', default=False)
+parser.add_argument("--load_lora", action='store_true', default=False)
 args = parser.parse_args()
 
 tokenizer = LlamaTokenizer.from_pretrained(args.model_path)
@@ -63,30 +64,33 @@ if device == "cuda":
         torch_dtype=torch.float16,
         device_map={"": 0},
     )
-    model = SteamGenerationMixin.from_pretrained(
-        model, LORA_WEIGHTS, torch_dtype=torch.float16, device_map={"": 0}
-    )
+    if args.load_lora:
+        model = SteamGenerationMixin.from_pretrained(
+            model, LORA_WEIGHTS, torch_dtype=torch.float16, device_map={"": 0}
+        )
 elif device == "mps":
     model = LlamaForCausalLM.from_pretrained(
         BASE_MODEL,
         device_map={"": device},
         torch_dtype=torch.float16,
     )
-    model = SteamGenerationMixin.from_pretrained(
-        model,
-        LORA_WEIGHTS,
-        device_map={"": device},
-        torch_dtype=torch.float16,
-    )
+    if args.load_lora:
+        model = SteamGenerationMixin.from_pretrained(
+            model,
+            LORA_WEIGHTS,
+            device_map={"": device},
+            torch_dtype=torch.float16,
+        )
 else:
     model = LlamaForCausalLM.from_pretrained(
         BASE_MODEL, device_map={"": device}, low_cpu_mem_usage=True
     )
-    model = SteamGenerationMixin.from_pretrained(
-        model,
-        LORA_WEIGHTS,
-        device_map={"": device},
-    )
+    if args.load_lora:
+        model = SteamGenerationMixin.from_pretrained(
+            model,
+            LORA_WEIGHTS,
+            device_map={"": device},
+        )
 
 def generate_prompt_and_tokenize0(data_point, maxlen):
     # cutoff the history to avoid exceeding length limit
@@ -276,9 +280,10 @@ with gr.Blocks() as demo:
         + "基于Chinese-Vicuna的游戏NPC"
         + "</h1>"
     )
-    description = gr.Markdown(
-        "加载模型文件:" + BASE_MODEL + "\n加载Lora:" + LORA_WEIGHTS
-    )
+    desc = "加载模型文件:" + BASE_MODEL
+    if args.load_lora:
+        desc += "\n加载Lora:" + LORA_WEIGHTS
+    description = gr.Markdown(desc)
     history = gr.components.State()
     with gr.Row().style(equal_height=False):
         with gr.Column(variant="panel"):
