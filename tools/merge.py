@@ -29,6 +29,7 @@ assert (
 
 BASE_MODEL = args.base_model
 LORA_MODEL = args.lora_model
+LORA_TOKEN = args.lora_token
 LOAD_8BIT = False
 OUTPUT_DIR = args.output_dir
 
@@ -43,7 +44,8 @@ else:
 
 print("device: ", device)
 
-tokenizer = LlamaTokenizer.from_pretrained(BASE_MODEL)
+print("Read LoRA tokenizer from:", LORA_TOKEN)
+tokenizer = LlamaTokenizer.from_pretrained(LORA_TOKEN)
 if device == "cuda":
     base_model = LlamaForCausalLM.from_pretrained(
         BASE_MODEL,
@@ -80,6 +82,17 @@ print(f"Extended vocabulary size: {len(tokenizer)}")
 
 first_weight = base_model.model.layers[0].self_attn.q_proj.weight
 first_weight_old = first_weight.clone()
+
+## infer the model size from the checkpoint
+emb_to_model_size = {
+    4096 : '7B',
+    5120 : '13B',
+    6656 : '30B',
+    8192 : '65B',
+}
+embedding_size = base_model.get_input_embeddings().weight.size(1)
+model_size = emb_to_model_size[embedding_size]
+print(f"Loading LoRA for {model_size} model")
 
 if device == 'cuda':
     lora_model = PeftModel.from_pretrained(
@@ -125,6 +138,8 @@ lora_model.train(False)
 
 # did we do anything?
 assert not torch.allclose(first_weight_old, first_weight)
+
+lora_model_sd = lora_model.state_dict()
 
 lora_model_sd = lora_model.state_dict()
 deloreanized_sd = {

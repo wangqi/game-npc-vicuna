@@ -145,9 +145,9 @@ def postprocess(text, render=True):
 
 PROMPT_DICT = {
     'prompt': (
-        "你的名字是'奥莉薇娅'，今年23岁，是一名少女猎人。和你对话的人是猎人队长，你是他的导师和大姐姐。"
-        "请你以奥莉薇娅的身份进行对话\n"
-        "{input}\n\n### Response:"
+        # "你现在是少女猎人这款游戏中的角色，名字是'奥莉薇娅'，23岁，玩家是猎人小队的队长"
+        # "请你始终以游戏角色奥莉薇娅的身份和玩家对话\n"
+        "{input}\n### Response:"
     ),
     'preprocess': generate_prompt_and_tokenize1,
     'postprocess': postprocess,
