@@ -25,3 +25,4 @@ CUDA_VISIBLE_DEVICES=${TOT_CUDA} torchrun --nproc_per_node=$CUDA_NUM --master_po
 mkdir -p $OUTPUT_PATH/final/
 cp adapter_config.json $OUTPUT_PATH/final/
 cp adapter_model.bin $OUTPUT_PATH/final/
+

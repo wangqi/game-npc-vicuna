@@ -9,5 +9,5 @@ echo "The output model path is: $MODEL_PATH"
 LORA_TOKEN="config"
 
 echo "Merge the base '$BASE_MODEL' with '$LORA_WEIGHT' LoRA weight"
-CUDA_VISIBLE_DEVICES=-1 python tools/merge.py --base_model $BASE_MODEL --lora_model $LORA_WEIGHT \
+CUDA_VISIBLE_DEVICES=0,1,2,3 python tools/merge.py --base_model $BASE_MODEL --lora_model $LORA_WEIGHT \
   --lora_token $LORA_TOKEN --output_dir $MODEL_PATH
