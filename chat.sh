@@ -1,6 +1,6 @@
 #BASE_MODEL="decapoda-research/llama-7b-hf" #"/model/13B_hf"
 BASE_MODEL="models/game_npc_vicuna_base"
-LORA_PATH="lora_out/final" #"checkpoint-6000"
+LORA_PATH="lora_out/final-7b" #"checkpoint-6000"
 USE_LOCAL=1 # 1: use local model, 0: use huggingface model
 DEBUG=0
 if [[ USE_LOCAL -eq 1 ]]

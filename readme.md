@@ -83,9 +83,36 @@ pip install -r ./requirements.txt
    ls -l models/huggyllama_chinese-vicuna-13b-belle-guanaco-chinese-llama-alpaca/
    ```
 
+3. 使用`data/data.json`文件对合并后的模型进行微调
+   ```bash
+   # fine tune on a 4 gpu p3.8xlarge machine.
+   # change the GPU settings accordingly
+   ./finetune.sh
    
+   # fine tune on a single 3090 GPU
+   ./finetune_single.sh
+   ```
 
-3. 【todo】
+   微调后的LoRA存放在`lora_out`目录下，可以拷贝到 `lora_out/final-7b`或者 `lora_out/final-13b`子目录下保存
+
+4. 将生成的LoRA权重与原版LLaMA模型合并，以便于模型推理和量化
+   ```bash
+   ./merge.sh [lora_path]
+   ```
+
+   其中lora_path是可选参数，默认为 `lora_out/final-7b`
+
+   合并后的模型保存在 `models/game_npc_vicuna`目录下
+
+5. 将合并后的模型转换为ggml FP16格式
+
+   ```bash
+   ./convert_ggml.sh [outtype]
+   ```
+
+   outtype支持f32, f16, q4_1和q4_0
+
+6. []
 
 ## 注意事项
 
