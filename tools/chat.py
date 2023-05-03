@@ -147,6 +147,7 @@ PROMPT_DICT = {
     'prompt': (
         # "你现在是少女猎人这款游戏中的角色，名字是'奥莉薇娅'，23岁，玩家是猎人小队的队长"
         # "请你始终以游戏角色奥莉薇娅的身份和玩家对话\n"
+        'The following conversation happens between a player called "猎人队长" and you "奥莉薇娅"\n'
         "{input}\n### Response:"
     ),
     'preprocess': generate_prompt_and_tokenize1,
@@ -292,7 +293,7 @@ with gr.Blocks() as demo:
                 input = gr.components.Textbox(
                     lines=2, label="Input", placeholder=">"
                 )
-                temperature = gr.components.Slider(minimum=0, maximum=1, value=1.0, label="Temperature")
+                temperature = gr.components.Slider(minimum=0, maximum=1, value=0.6, label="Temperature")
                 topp = gr.components.Slider(minimum=0, maximum=1, value=0.9, label="Top p")
                 topk = gr.components.Slider(minimum=0, maximum=100, step=1, value=60, label="Top k")
                 beam_number = gr.components.Slider(minimum=1, maximum=10, step=1, value=4, label="Beams Number")
@@ -303,10 +304,10 @@ with gr.Blocks() as demo:
                     minimum=1, maximum=100, step=1, value=5, label="Min New Tokens"
                 )
                 repeat_penal = gr.components.Slider(
-                    minimum=0.1, maximum=10.0, step=0.1, value=2.0, label="Repetition Penalty"
+                    minimum=0.1, maximum=10.0, step=0.1, value=4.0, label="Repetition Penalty"
                 )
                 max_memory = gr.components.Slider(
-                    minimum=0, maximum=2048, step=1, value=256, label="Max Memory"
+                    minimum=0, maximum=2048, step=1, value=1024, label="Max Memory"
                 )
                 do_sample = gr.components.Checkbox(label="Use sample")
                 input_components = [
