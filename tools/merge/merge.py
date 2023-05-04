@@ -140,8 +140,6 @@ lora_model.train(False)
 assert not torch.allclose(first_weight_old, first_weight)
 
 lora_model_sd = lora_model.state_dict()
-
-lora_model_sd = lora_model.state_dict()
 deloreanized_sd = {
     k.replace("base_model.model.", ""): v
     for k, v in lora_model_sd.items()
