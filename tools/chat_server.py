@@ -14,16 +14,10 @@ assert (
 from transformers import LlamaTokenizer, LlamaForCausalLM, GenerationConfig
 
 
-PROMPT_DICT = {
-    'prompt': ("{input}->"),
-}
-
 def generate_prompt_and_tokenize(tokenizer, data_point, maxlen):
     history = ""
     for i in data_point['history']:
-        # history += ["猎人队长:" + i['input']+"\n"+"奥莉薇娅:" + i['output'] for i in data_point['history']] + "\n"
         history += i['input'] + "\n" + i['output'] + "\n"
-    # input_prompt = history + "\n猎人队长:" + data_point['input'] + "\n奥莉薇娅:"
     input_prompt = history + "\n" + data_point['input'] + "\n"
     input_prompt = input_prompt[-maxlen:]
     input_prompt = PROMPT_DICT['prompt'].format_map({'input':input_prompt})
@@ -48,6 +42,21 @@ def postprocess(text, render=True):
         output =  "".join(lines)
         # output = output.replace('<br/><pre>','\n<pre>') work for html; but not for gradio
     return output
+
+
+PROMPT_DICT = {
+    'prompt': (
+        # "你假扮少女猎人中的角色\"奥莉薇娅\", 23岁, 性格高冷经验丰富, 是猎人队长的教官\n"
+        # "和你对话的人是少女猎人中的猎人队长\n"
+        "{input}->"
+    ),
+    # 'prompt': (
+    #     "You are a role in game '少女猎人'\n"
+    #     "Please start conversion with player\n"
+    #     "Do not reply with questions\n"
+    #     "{input}\n->"
+    # ),
+}
 
 
 def evaluate(tokenizer, device, model, inputs, history, temperature=0.5, top_p=0.75, top_k=40, num_beams=4,

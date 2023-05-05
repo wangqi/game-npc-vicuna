@@ -5,7 +5,7 @@ MODEL_PATH="models/game_npc_vicuna_base"
 # lora_checkpoint="./checkpoints/chinese-vicuna-lora-8b-belle-and-guanaco"
 from_data_beginning=True
 
-python tools/finetune.py \
+python tools/finetune_f16.py \
 --data_path $DATA_PATH \
 --output_path $OUTPUT_PATH \
 --model_path $MODEL_PATH \
