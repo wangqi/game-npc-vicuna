@@ -1,4 +1,4 @@
-BASE_MODEL="models/huggyllama_chinese-alpaca-plus-lora-7b-vicuna"
+BASE_MODEL="models/huggyllama_chinese-alpaca-plus-lora-7b"
 LORA_WEIGHT="${1:-"lora_out/huntress-7b"}"
 MODEL_PATH="models/game_npc_vicuna_huntress"
 OUT_TYPE="f16"
