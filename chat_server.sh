@@ -21,8 +21,8 @@ fi
 if [[ DEBUG -eq 1 ]]
 then
     jurigged -v tools/chat_server.py --model_path $BASE_MODEL --lora_path $LORA_PATH --use_local $USE_LOCAL\
-    --use_typewriter 0 --share_link 0 # --load_lora
+    --use_typewriter 0 --share_link 0 --load_lora
 else
 python tools/chat_server.py --model_path $BASE_MODEL --lora_path $LORA_PATH --use_local $USE_LOCAL\
-    --use_typewriter 0 --share_link 0 # --load_lora
+    --use_typewriter 0 --share_link 0 --load_lora
 fi
