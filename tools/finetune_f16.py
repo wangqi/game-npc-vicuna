@@ -37,6 +37,7 @@ parser.add_argument("--data_path", type=str, default="data/data.json")
 parser.add_argument("--output_path", type=str, default="models/game_npc_vicuna")
 parser.add_argument("--model_path", type=str, default="models/game_npc_vicuna_base")
 parser.add_argument("--prompt_path", type=str, default="samples/prompt_tpl.txt")
+parser.add_argument("--prompt_no_input_path", type=str, default="samples/prompt_tpl_no_input.txt")
 parser.add_argument("--num_epochs", type=int, default=3)
 parser.add_argument("--eval_steps", type=int, default=200)
 parser.add_argument("--save_steps", type=int, default=200)
@@ -197,7 +198,8 @@ if os.path.exists(args.prompt_path):
     with open(args.prompt_path, 'r') as f:
         PROMPT_TEMPLATE = f.read()
 else:
-    PROMPT_TEMPLATE = """Below is an instruction that describes a task, paired with an input that provides further context. Write a response that appropriately completes the request.
+    PROMPT_TEMPLATE = """Below is an instruction that describes a task. Write a response that appropriately completes the request.
+
 ### Instruction:
 {instruction}
 
@@ -207,10 +209,29 @@ else:
 ### Response:
 """
 
+PROMPT_NO_INPUT_TEMPLATE = ""
+# use os to check if file exists
+if os.path.exists(args.prompt_no_input_path):
+    with open(args.prompt_no_input_path, 'r') as f:
+        PROMPT_NO_INPUT_TEMPLATE = f.read()
+else:
+    PROMPT_NO_INPUT_TEMPLATE = """Below is an instruction that describes a task, paired with an input that provides further context. Write a response that appropriately completes the request.
+ 
+### Instruction:
+{instruction}
+
+### Response:
+"""
+
 def generate_and_tokenize_prompt(data_point):
     # This function masks out the labels for the input,
     # so that our loss is computed only on the response.
-    user_prompt =  PROMPT_TEMPLATE.format(instruction=data_point["instruction"], input=data_point["input"])
+    if data_point["input"] == "":
+        print(PROMPT_NO_INPUT_TEMPLATE)
+        print(data_point)
+        user_prompt = PROMPT_NO_INPUT_TEMPLATE.format(instruction=data_point["instruction"])
+    else:
+        user_prompt = PROMPT_TEMPLATE.format(instruction=data_point["instruction"], input=data_point["input"])
     len_user_prompt_tokens = (
             len(
                 tokenizer(

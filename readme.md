@@ -14,8 +14,8 @@
 
 本项目使用了一款网络游戏的世界观和文案设定，形成了10K的问题集，大约654K汉字量，去调优Vicuna模型，调优在单3090 GPU的机器上运营，因此选用了7B参数量的模型做基础。具体用到的模型如下：
 
-1. [Chinese-Vicuna](https://github.com/Facico/Chinese-Vicuna) 这是一个优秀的中文低资源的llama+lora方案，这个模型使用了guanaco_belle数据集在vicuna标准模型上做微调，使其支持中文，但因为中文的语料不足够多，使其中文的语言能力仍有缺陷。
-2. [Chinese-LLaMA-Alpaca](https://github.com/ymcui/Chinese-LLaMA-Alpaca) 这是另一个优秀的中文LLaMA/Alpaca权重模型，在4月28日发布了7B的优化版本，参见：[民间版中文羊驼模型（Plus）v3.0](https://github.com/ymcui/Chinese-LLaMA-Alpaca/releases/tag/v3.0)
+1. [Chinese-LLaMA-Alpaca](https://github.com/ymcui/Chinese-LLaMA-Alpaca) 这是另一个优秀的中文LLaMA/Alpaca权重模型，在4月28日发布了7B的优化版本，参见：[民间版中文羊驼模型（Plus）v3.0](https://github.com/ymcui/Chinese-LLaMA-Alpaca/releases/tag/v3.0)
+2. [Chinese-Vicuna](https://github.com/Facico/Chinese-Vicuna) 这是一个优秀的中文低资源的llama+lora方案，本项目中的代码较多的参考了这个项目的脚本。
 
 ## 环境准备
 
@@ -47,7 +47,7 @@ pip install -r ./requirements.txt
 使用llama.cpp测试模型效果
 
 ```bash
-./tools/llama -ins --color -m models/huggyllama_chinese-alpaca-plus-lora-7b-vicuna/ggml-f16.bin --repeat_penalty 4
+./tools/llama -ins --color -m models/huggyllama_chinese-alpaca-plus-lora-7b/ggml-f16.bin --repeat_penalty 4
 
 > 你是一个资深导游，你能介绍一下中国的首都吗?
 ```
@@ -58,21 +58,7 @@ pip install -r ./requirements.txt
 
 对项目微调的步骤如下：
 
-1. 合并网络小说训练权重，并测试效果
-
-   ```bash
-   ./merge.sh
-   ```
-
-   测试
-
-   ```bash
-   ./tools/llama -ins --color -m models/game_npc_vicuna_huntress/ggml-f16.bin --repeat_penalty 4
-   ```
-
-   
-
-2. 使用`data/data.json`文件对合并后的模型进行微调
+1. 使用`data/data.json`文件对合并后的模型进行微调
 
    ```bash
    # fine tune on a 4 gpu p3.8xlarge machine.
@@ -83,26 +69,27 @@ pip install -r ./requirements.txt
    ./finetune_single.sh
    ```
 
-   微调后的LoRA存放在`lora_out`目录下，可以拷贝到 `lora_out/final-7b`或者 `lora_out/final-13b`子目录下保存
+   微调后的LoRA存放在`lora_out`目录下，可以拷贝到 `lora_out/huntress-7b`目录下保存
 
-3. 将生成的LoRA权重与原版LLaMA模型合并，以便于模型推理和量化
+2. 将生成的LoRA权重与原版LLaMA模型合并，以便于模型推理和量化
    ```bash
    ./merge.sh [lora_path]
    ```
 
-   其中lora_path是可选参数，默认为 `lora_out/final-7b`
+   其中lora_path是可选参数，默认为 `lora_out/huntress-7b`
 
-   合并后的模型保存在 `models/game_npc_vicuna`目录下
+   合并后的模型保存在 `models/game_npc_vicuna_huntress`目录下。脚本将合并后的模型转换为ggml FP16格式。
 
-4. 将合并后的模型转换为ggml FP16格式
-
+3. 测试合并后的模型效果
    ```bash
-   ./convert_ggml.sh [outtype]
+   ./tools/llama -ins --color -m models/game_npc_vicuna_huntress/ggml-f16.bin --repeat_penalty 4
+   
+   > 你是谁？
    ```
 
-   outtype支持f32, f16, q4_1和q4_0
+   
 
-5. []
+4. 【】
 
 ## 注意事项
 

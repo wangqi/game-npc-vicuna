@@ -25,8 +25,8 @@ def generate_prompt_and_tokenize(tokenizer, data_point, maxlen):
     return input_ids
 
 def postprocess(text, render=True):
-    output = text.split("->")[1].strip()
-    printf('>>> output:', output)
+    output = text.split("### Response:")[1].strip()
+    printf('### Response:', output)
     if render:
         # fix gradio chatbot markdown code render bug
         lines = output.split("\n")
@@ -46,9 +46,10 @@ def postprocess(text, render=True):
 
 PROMPT_DICT = {
     'prompt': (
-        "假设你身处少女猎人的游戏世界,玩家被称为猎人队长或者领队大人, 始终以角色回复玩家\n"
-        # "和你对话的人是少女猎人中的猎人队长\n"
-        "{input}->"
+        "假设你身处少女猎人的游戏世界,玩家被称为猎人队长或者领队大人, 根据Instruction中的描述，用中文以第一人称回答\n"
+        "### Instruction:"
+        "{input}"
+        "### Response:"
     ),
     # 'prompt': (
     #     "You are a role in game '少女猎人'\n"

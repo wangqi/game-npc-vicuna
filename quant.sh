@@ -1,6 +1,6 @@
 MODEL="models/game_npc_vicuna_base"
 QUANT_PATH="models/game_npc_vicuna_gptq"
-QUANT_TYPE="q8_0"
+QUANT_TYPE="q4_2"
 QUANT_MODEL="game_npc_vicuna_ggml_f16.bin"
 
 echo "Quantized the $QUANT_PATH/$MODEL using $QUANT_TYPE"

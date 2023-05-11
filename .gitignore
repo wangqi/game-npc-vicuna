@@ -165,3 +165,4 @@ loras/**
 lora_out/**
 models/**
 data/merge.json
+test/**

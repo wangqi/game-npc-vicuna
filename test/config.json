@@ -1,0 +1,14 @@
+[
+    {
+        "name": "The Bloke Vicuna-13B 4bit",
+        "model_id": "TheBloke/stable-vicuna-13B-HF"
+    },
+    {
+        "name": "Chinese Alpaca 7B lora plus",
+        "model_id": "godxin/chinese_alpaca_plus_lora_7b"
+    },
+    {
+        "name": "Huggy LlaMa 13B",
+        "model_id": "huggyllama/llama-13b"
+    }
+]
