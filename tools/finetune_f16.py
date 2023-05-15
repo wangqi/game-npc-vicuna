@@ -227,8 +227,8 @@ def generate_and_tokenize_prompt(data_point):
     # This function masks out the labels for the input,
     # so that our loss is computed only on the response.
     if data_point["input"] == "":
-        print(PROMPT_NO_INPUT_TEMPLATE)
-        print(data_point)
+        # print(PROMPT_NO_INPUT_TEMPLATE)
+        # print(data_point)
         user_prompt = PROMPT_NO_INPUT_TEMPLATE.format(instruction=data_point["instruction"])
     else:
         user_prompt = PROMPT_TEMPLATE.format(instruction=data_point["instruction"], input=data_point["input"])

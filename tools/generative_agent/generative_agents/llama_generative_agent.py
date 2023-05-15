@@ -9,10 +9,13 @@ from langchain.experimental.generative_agents.generative_agent import \
 class LlamaGenerativeAgent(GenerativeAgent):
 
     system_prompt: str = (
-        "A chat between a curious user and an artificial intelligence assistant. The assistant "
-        "gives helpful, detailed, and polite answers to the user's questions.\n"
-        "###USER: %s\n"
-        "###ASSISTANT: ")
+        # "A chat between a curious user and an artificial intelligence assistant. The assistant "
+        # "gives helpful, detailed, and polite answers to the user's questions.\n"
+        # "###USER: %s\n"
+        # "###ASSISTANT: ")
+        "假设你身处少女猎人的游戏世界,玩家被称为猎人队长或者领队大人, 根据Instruction中的描述，用中文以第一人称回答\n"
+        "### %s\n"
+        "### Response:")
 
     def chain(self, prompt: PromptTemplate) -> LLMChain:
         return LLMChain(
@@ -73,6 +76,7 @@ class LlamaGenerativeAgent(GenerativeAgent):
             f"embellish if you don't know. Do not return a list.\n"
             "Input: {relevant_memories}\n"
         )
+        print("system_prompt: ", self.system_prompt, ", instruction: ", instruction)
         prompt = PromptTemplate.from_template(
             self.system_prompt % instruction
         )

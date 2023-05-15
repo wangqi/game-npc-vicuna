@@ -12,7 +12,7 @@ MODEL_PATH="models/game_npc_vicuna_base"
 from_data_beginning=True
 TEST_SIZE=0.3
 
-CUDA_VISIBLE_DEVICES=${TOT_CUDA} torchrun --nproc_per_node=$CUDA_NUM --master_port=$PORT tools/finetune_f16.py \
+CUDA_VISIBLE_DEVICES=${TOT_CUDA} torchrun --nproc_per_node=$CUDA_NUM --master_port=$PORT tools/finetune.py \
 --data_path $DATA_PATH \
 --output_path $OUTPUT_PATH \
 --model_path $MODEL_PATH \

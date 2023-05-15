@@ -10,8 +10,7 @@ from ..llama_memory import LlamaGenerativeAgentMemory
 
 @pytest.fixture
 def model_path():
-    return "/Users/jon/Downloads/ggml-vicuna-13b-1.1-q4_2.bin"
-    # return "/Users/jon/Documents/models/stable-vicuna-13B.ggml.q5_1.bin"
+    return "../../../../models/game_npc_vicuna_huntress/ggml-f16.bin"
 
 
 @pytest.fixture
