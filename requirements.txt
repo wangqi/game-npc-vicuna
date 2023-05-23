@@ -83,11 +83,11 @@ jupyter_server_terminals==0.4.4
 jupyterlab-pygments==0.2.2
 jupyterlab-widgets==3.0.7
 kiwisolver==1.4.4
-langchain==0.0.161
+langchain==0.0.174
 lark==1.1.5
 linkify-it-py==2.0.0
 lit==16.0.2
-llama-cpp-python==0.1.45
+llama-cpp-python==0.1.51
 loralib==0.1.1
 lz4==4.3.2
 markdown-it-py==2.2.0

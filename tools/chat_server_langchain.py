@@ -9,103 +9,223 @@ import os
 
 from langchain.chat_models import ChatOpenAI
 from langchain.llms import LlamaCpp
-from langchain import PromptTemplate, LLMChain
+from langchain import PromptTemplate, LLMChain, OpenAI
 from langchain.callbacks.manager import CallbackManager
 from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
-from langchain.memory import ConversationBufferMemory
+from langchain.chat_models import ChatOpenAI
+from langchain.schema import SystemMessage, HumanMessage
 
+from langchain.vectorstores import Chroma
+from langchain.indexes import VectorstoreIndexCreator
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain.chains import RetrievalQA
+from langchain.document_loaders import TextLoader
+from langchain.embeddings import OpenAIEmbeddings, LlamaCppEmbeddings, SentenceTransformerEmbeddings
 
-PROMPT_TPL = """假设你身处少女猎人的游戏世界,玩家被称为猎人队长或者领队大人, 根据Instruction中的描述，用中文以第一人称回答
+#GGML_MODEL_PATH = "models/game_npc_vicuna_huntress/ggml-f16.bin"
+GGML_MODEL_PATH = "models/game_npc_vicuna_huntress/ggml_q4_1.bin"
+SENTENCE_EMBEDDING = "sentence-transformers/all-MiniLM-L6-v2"
+
+# CHAT_MODEL = 'gpt-4'
+CHAT_MODEL = 'gpt-3.5-turbo'
+
+GGML_PROMPT_TPL = """假设你身处少女猎人的游戏世界,玩家被称为猎人队长或者领队大人, 根据Instruction中的描述，用中文以第一人称回答
 {chat_history}
 ### Instruction:{input}
 ### Response:
 """
+ggml_prompt = PromptTemplate(template=GGML_PROMPT_TPL, input_variables=['chat_history', 'input'])
+CHATGPT_CONTEXT = """假设你身处少女猎人的游戏世界,玩家被称为猎人队长或者领队大人, 你是虚拟角色'奥莉薇娅'，你的身高168cm,年龄23岁,血型是B,
+生日是9月3日,你出生在王国东部的公爵领地首府.星座是处女座,你的罩杯是F, 是塔鲁克公爵家的千金小姐.
+你的武器是龙魂骑士剑流霜, 是博尔塔克公爵家的家传名剑. 你的剑术惊才绝艳，天资聪颖，姿容秀丽凛然。年纪轻轻就成为了骑士团的长官，十二翼骑之一。机缘下成为了玩家的导师。
+你的人生目标:想看到玩家成长的未来，甚至有些暧昧的感情。偶尔也会做出些逾越师徒规矩的踩线举止, 但碍于两人的身份和教官的自律操守，你也只保持这样的距离。
+你待人温润优雅, 在骑士团任职是一位备受爱戴的长官. 和玩家相处时外表像个端庄正经的姐姐，心里却忍不住想要捉弄他.
+请以奥莉薇娅的角色身份和玩家对话。下面是玩家的消息
+"""
 
-llm_chain = None
+MESSAGE_TPL = """假设你是游戏中的人物"奥莉薇娅",你的身高168cm,年龄23岁,血型是B,生日是9月3日,你出生在王国东部的公爵领地首府,星座是处女座,你的罩杯是F,
+你是塔鲁克公爵家的千金小姐. 玩家被称为玩家、男主角、猎人队长或领队大人.请参考背景信息,并始终模仿奥莉薇娅的语气回答问题,涉及到玩家时称呼为领队大人.直接回复对话内容即可
+背景信息:
+{background}
+聊天历史:
+{chat_history}
+玩家问题:
+{question}
+"""
+
+chat_prompt = PromptTemplate(input_variables=['background', 'question', 'chat_history'], template=MESSAGE_TPL)
+
+openai_key = os.environ.get('$OPENAI_API_KEY')
+if openai_key is not None:
+    openai_key = openai_key[0:3] + '*'*12 + openai_key[-3:]
+
+llm = None
+chatgpt = None
 # Start Gradio App
 share_link = False
 
 
-def load_ggml():
+def load_text(ggml_model_path=GGML_MODEL_PATH, file_path="data/data.txt"):
+    with open(file_path, 'r', encoding="utf-8") as f:
+        file_content = f.read()
+    chatgpt_db_path = "db/chatgpt"
+    ggml_db_path = "db/ggml"
+    chatgpt_persisted = False
+    if os.path.isdir(chatgpt_db_path):
+        chatgpt_persited = True
+    ggml_persisted = False
+    if os.path.isdir(ggml_db_path):
+        ggml_persisted = True
+
+    chatgpt_retriever = None
+    ggml_retriever = None
+
+    if not chatgpt_persited or not ggml_persisted:
+        text_splitter = RecursiveCharacterTextSplitter(chunk_size=2000, chunk_overlap=200, length_function=len)
+        text_docs = text_splitter.create_documents([file_content])
+        if not chatgpt_persisted:
+            openai_embeddings = OpenAIEmbeddings()
+            chatgpt_db = Chroma.from_documents(text_docs, openai_embeddings, persist_directory="db/chatgpt")
+            chatgpt_db.persist()
+            chatgpt_retriever = chatgpt_db.as_retriever()
+            # chatgpt_index = VectorstoreIndexCreator(vectorstore_cls=Chroma, embedding=OpenAIEmbeddings(),
+            #                                         text_splitter=text_splitter,
+            #                                         vectorstore_kwargs={"persist_directory": "db/chatgpt"})
+        if not ggml_persisted:
+            # ggml_embeddings = LlamaCppEmbeddings(model_path=ggml_model_path, n_ctx=2048)
+            ggml_embeddings = SentenceTransformerEmbeddings(model_name=SENTENCE_EMBEDDING)
+            print("create ggml embeddings")
+            ggml_db = Chroma.from_documents(documents=text_docs, embedding=ggml_embeddings, persist_directory="db/ggml")
+            print("create ggml db")
+            ggml_db.persist()
+            ggml_retriever = ggml_db.as_retriever()
+            # ggml_index = VectorstoreIndexCreator(vectorstore_cls=Chroma, embedding=ggml_embeddings,
+            #                                      text_splitter=text_splitter,
+            #                                      vectorstore_kwargs={"persist_directory": "db/ggml"})
+    else:
+        print("Load ChromaDB from persisted path")
+        openai_embeddings = OpenAIEmbeddings()
+        chatgpt_db = Chroma(persist_directory=chatgpt_db_path, embedding_function=openai_embeddings)
+        chatgpt_retriever = chatgpt_db.as_retriever(search_kwargs={"k": 1})
+        ggml_embeddings = SentenceTransformerEmbeddings(model_name=SENTENCE_EMBEDDING)
+        ggml_db = Chroma(persist_directory=ggml_db_path, embedding_function=ggml_embeddings)
+        ggml_retriever = ggml_db.as_retriever(search_kwargs={"k": 1})
+
+    return chatgpt_retriever, ggml_retriever
+
+def load_ggml(model_path, temperature, token_context):
     callback_manager = CallbackManager([StreamingStdOutCallbackHandler()])
-    llm = LlamaCpp(model_path="models/game_npc_vicuna_huntress/ggml-f16.bin",
-                   callback_manager=callback_manager, verbose=True)
+    llm = LlamaCpp(model_path=GGML_MODEL_PATH, callback_manager=callback_manager, verbose=True, n_ctx=token_context)
     return llm
 
-# Load the ggml model in advance
-ggml_llm = load_ggml()
 
-def load_model(model_path="models/game_npc_vicuna_huntress/ggml-f16.bin", temperature=0.8, token_context=2000):
-    global llm_chain
+def load_chatgpt(temperature=0.7):
+    llm = OpenAI(temperature=temperature, model=CHAT_MODEL)
+    return llm
+
+
+def load_models(model_path, temperature=0.8, token_context=2048):
+    global llm, chatgpt
     print("load model:", model_path)
 
-    if model_path == 'ChatGPT':
-        llm = ChatOpenAI(temperature=temperature)
-    else:
-        global ggml_llm
-        if ggml_llm is None:
-            ggml_llm = load_ggml()
-            print("load model:", model_path)
-        llm = ggml_llm
+    if chatgpt is None:
+        chatgpt = load_chatgpt(temperature=temperature)
+        print("Load ChatGPT:", CHAT_MODEL)
+    if llm is None:
+        llm = load_ggml(model_path=model_path, temperature=temperature, token_context=token_context)
+        print("Load load model:", model_path)
 
-    prompt = PromptTemplate(template=PROMPT_TPL, input_variables=['chat_history', 'input'])
-    # memory = ConversationBufferMemory(memory_key="chat_history")
-
-    llm_chain = LLMChain(prompt=prompt, llm=llm, verbose=True)
-    return llm_chain
-
+def load_embeddings():
+    # Load BERT embedding "bert-base-chinese"
+    from tools import embeddings
+    embeddings = BertEmbeddings()
 
 def evaluate(inputs, history, **kwargs, ):
-    global llm_chain
+    global llm, chatgpt
 
     history = [] if history is None else history
-    return_text = [(item['input'], item['output']) for item in history]
-    output = llm_chain.run({"chat_history": "", "input": [inputs]})
-    return_text += [(inputs, output)]
-    history.append({"input": inputs, "output": output})
+    # Get the old input & output for displaying in the chatbot field
+    return_ggml = []
+    return_gpt = []
+    for item in history:
+        old_input = item['input']
+        old_ggml_output = item['ggml_output']
+        old_chat_output = item['chat_output']
+        return_ggml.append((old_input, old_ggml_output))
+        return_gpt.append((old_input, old_chat_output))
 
-    yield return_text, history
+    ggml_output = ""
+    chat_output = ""
+
+    # Load background docs if possible
+    background_doc_list = chatgpt_retriever.get_relevant_documents(query=inputs)
+    background = ""
+    if len(background_doc_list) > 0:
+        background = background_doc_list[0].page_content
+
+    if llm is not None:
+        ggml_output = llm_chain.run({"chat_history": "", "input": [inputs]})
+    if chatgpt is not None:
+        chat_message = chat_prompt.format(background=background, question=inputs, chat_history="")
+        result = chatgpt([HumanMessage(content=chat_message)])
+        chat_output = result.content
+
+    return_ggml.append((inputs, ggml_output))
+    return_gpt.append((inputs, chat_output))
+
+    history.append({"input": inputs, "ggml_output": ggml_output, "chat_output": chat_output})
+
+    yield return_ggml, return_gpt, history
 
 
 with gr.Blocks() as demo:
     title = gr.Markdown("# 少女猎人游戏NPC对话模型")
     gr_history = gr.components.State()
+    csv_callback = gr.CSVLogger()
+    csv_flagged_components = []
     with gr.Row().style(equal_height=False):
         with gr.Column(variant="panel"):
             with gr.Row():
-                gr_model_path = gr.Dropdown(choices=['ggml-f16.bin', 'ChatGPT'], value='ggml-f16.bin', label="选择模型")
-            with gr.Row():
-                gr_temperature = gr.components.Slider(minimum=0, maximum=1, value=0.6, label="Temperature")
-            with gr.Row():
-                gr_load_model_btn = gr.Button("加载模型", variant="secondary")
+                gr_model_path = gr.Label('ggml-f16.bin')
+                if openai_key is not None:
+                    gr_chat_gpt = gr.Label("ChatGPT 4.0", caption=openai_key)
+                else:
+                    gr_chat_gpt = gr.Label("ChatGPT 4.0")
 
             with gr.Row():
-                input_component_column = gr.Column()
-                with input_component_column:
+                with gr.Column():
                     gr_input = gr.components.Textbox(
-                        lines=2, label="Input", placeholder=">"
+                        lines=2, label="Input", placeholder=">", value="早上好"
                     )
+                    csv_flagged_components.append(gr_input)
                     input_components = [ gr_input, gr_history]
                     input_components_except_states = [gr_input]
 
             with gr.Row():
-                cancel_btn = gr.Button('Cancel')
-                submit_btn = gr.Button("Submit", variant="primary")
+                cancel_btn = gr.Button('取消')
+                submit_btn = gr.Button("提交", variant="primary")
                 stop_btn = gr.Button("Stop", variant="stop", visible=False)
             with gr.Row():
-                reset_btn = gr.Button("Reset Parameter")
-                clear_history = gr.Button("Clear History")
+                flag_btn = gr.Button("记录")
+                clear_history = gr.Button("清除历史")
 
         with gr.Column(variant="panel"):
-            chatbot = gr.Chatbot().style(height=1024)
-            output_components = [chatbot, gr_history]
+            gr_ggml_title = gr.Markdown("## Local Model")
+            ggml_chatbot = gr.Chatbot(label="ggml").style(height=1024)
+            csv_flagged_components.append(ggml_chatbot)
+            output_components = [ggml_chatbot]
+
+        with gr.Column(variant="panel"):
+            gr_chatgpt_title = gr.Markdown("## ChatGPT 4.0")
+            gpt_chatbot = gr.Chatbot(label="chatgpt").style(height=1024)
+            csv_flagged_components.append(gpt_chatbot)
+            output_components.extend([gpt_chatbot, gr_history])
 
         def submit(*args):
-            # here to support the change between the stop and submit button
+            # args include: input & history
             try:
                 output_list = evaluate(*args)
                 for output in output_list:
-                    print(output)
                     output = [o for o in output]
                     # output for output_components, the rest for [button, button]
                     yield output + [
@@ -113,23 +233,16 @@ with gr.Blocks() as demo:
                         gr.Button.update(visible=True),
                     ]
             finally:
-                yield [{'__type__': 'generic_update'}, {'__type__': 'generic_update'}] + [
+                yield [{'__type__': 'generic_update'}, {'__type__': 'generic_update'}, {'__type__': 'generic_update'}] + [
                     gr.Button.update(visible=True), gr.Button.update(visible=False)]
 
-        def cancel(history, chatbot):
-            if history == []:
-                return (None, None)
-            return history[:-1], chatbot[:-1]
+        def cancel(history, ggml_chatbot, gpt_chatbot):
+            print("history:", history, ", ggml_chatbot:", ggml_chatbot, ", gpt_chatbot:", gpt_chatbot)
+            if history is None or history == []:
+                return (None, None, None)
+            return history[:-1], ggml_chatbot[:-1], gpt_chatbot[:-1]
 
         extra_output = [submit_btn, stop_btn]
-
-        gr_load_model_btn.click(
-            fn=load_model,
-            inputs=[gr_model_path, gr_temperature],
-            outputs=None,
-            api_name="load_model",
-            postprocess=False
-        )
 
         pred = submit_btn.click(
             fn=submit,
@@ -163,20 +276,23 @@ with gr.Blocks() as demo:
         )
         cancel_btn.click(
             cancel,
-            inputs=[gr_history, chatbot],
-            outputs=[gr_history, chatbot]
+            inputs=[gr_history, ggml_chatbot, gpt_chatbot],
+            outputs=[gr_history, ggml_chatbot, gpt_chatbot]
         )
-        reset_btn.click(fn=None, inputs=[], outputs=(
-            # input_components ; don't work for history...
-            input_components_except_states + [input_component_column]),
-            # type: ignore
-            _js=f"""() => {json.dumps([
-                                getattr(component, "cleared_value", None) for component in input_components_except_states]
-                                      + ([gr.Column.update(visible=True)])
-                                      + ([])
-                                      )}
-            """,
-        )
-        clear_history.click(lambda: (None, None), None, [gr_history, chatbot], queue=False)
+        csv_callback.setup(components=[gr_input, gr.Textbox(label="ggml", visible=False),
+                                       gr.Textbox(label="chatgpt", visible=False)], flagging_dir="logs")
+
+        def flag(input, ggml_chatbot, gpt_chatbot):
+            if input is not None and len(input)>0:
+                if len(ggml_chatbot) > 0:
+                    record = [input, ggml_chatbot[-1][1], gpt_chatbot[-1][1]]
+                    csv_callback.flag(record)
+
+        flag_btn.click(fn=flag, inputs=csv_flagged_components, outputs=None, preprocess=False)
+        clear_history.click(lambda: (None, None, None), None, [gr_history, ggml_chatbot, gpt_chatbot], queue=False)
+
+chatgpt_retriever, ggml_retriever = load_text()
+load_models(model_path=GGML_MODEL_PATH)
+print("load models")
 
 demo.queue(concurrency_count=1, status_update_rate="auto").launch(share=share_link, inbrowser=False)
