@@ -26,6 +26,7 @@ parser.add_argument("--wandb", action="store_true", default=False)
 parser.add_argument("--prompt_path", type=str, default="data/prompt_tpl.txt")
 parser.add_argument("--data_path", type=str, default="data/data.json")
 parser.add_argument("--output_path", type=str, default="models/game_npc_vicuna")
+parser.add_argument("--tokenizer_path", type=str, default="config/chinese_llama_alpaca")
 parser.add_argument("--model_path", type=str, default="models/game_npc_vicuna_base")
 parser.add_argument("--num_epochs", type=int, default=10)
 parser.add_argument("--eval_steps", type=int, default=200)
@@ -33,14 +34,16 @@ parser.add_argument("--save_steps", type=int, default=200)
 parser.add_argument("--test_size", type=float, default=0.3)
 parser.add_argument("--resume_from_checkpoint", type=str, default=None)
 parser.add_argument("--target_models", type=str, default="q_proj,k_proj,v_proj,down_proj,gate_proj,up_proj")
+parser.add_argument("--micro_batch_size", type=int, default=8)
+parser.add_argument("--batch_size", type=int, default=64)
 args = parser.parse_args()
 
 if not args.wandb:
     os.environ["WANDB_MODE"] = "disable"
 
 # optimized for RTX 3090 & 4090. for larger GPUs, increase some of these?
-MICRO_BATCH_SIZE = 8
-BATCH_SIZE = 64
+MICRO_BATCH_SIZE = args.micro_batch_size
+BATCH_SIZE = args.batch_size
 MAX_STEPS = None
 GRADIENT_ACCUMULATION_STEPS = BATCH_SIZE // MICRO_BATCH_SIZE
 EPOCHS = args.num_epochs
@@ -106,9 +109,13 @@ model = LlamaForCausalLM.from_pretrained(
     load_in_8bit=True,
     device_map=device_map,
 )
-print("load tokenizer from path:", args.model_path)
+
+tokenizer_path = args.tokenizer_path
+if not os.path.exists("tokenizer_config.json"):
+    tokenizer_path = args.model_path
+print("load tokenizer from path:", tokenizer_path)
 tokenizer = LlamaTokenizer.from_pretrained(
-    args.model_path, add_eos_token=add_eos_token
+    tokenizer_path, add_eos_token=add_eos_token
 )
 
 model = prepare_model_for_int8_training(model)
@@ -192,6 +199,7 @@ model.print_trainable_parameters()
 
 # Load prompt template
 PROMPT_TEMPLATE = ""
+
 
 def generate_prompt(data_point):
     global PROMPT_TEMPLATE

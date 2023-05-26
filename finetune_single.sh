@@ -3,7 +3,8 @@ DATA_PATH="./data/data.json"
 OUTPUT_PATH="lora_out"
 MODEL_PATH="models/game_npc_vicuna_base"
 # lora_checkpoint="./checkpoints/chinese-vicuna-lora-8b-belle-and-guanaco"
-from_data_beginning=True
+TEST_SIZE=0.3
+TOKENIZER_PATH="config/chinese-llama-alpaca/"
 
 python tools/finetune.py \
 --data_path $DATA_PATH \
@@ -11,11 +12,10 @@ python tools/finetune.py \
 --model_path $MODEL_PATH \
 --eval_steps 200 \
 --save_steps 200 \
---test_size 0.3 \
+--test_size $TEST_SIZE \
 --prompt_path data/train_tpl.txt \
---target_models q_proj,k_proj,v_proj,down_proj,gate_proj,up_proj
-# --resume_from_checkpoint $lora_checkpoint \
-# --ignore_data_skip $from_data_beginning
+--target_models q_proj,k_proj,v_proj,down_proj,gate_proj,up_proj \
+--tokenizer_path $TOKENIZER_PATH
 
 mkdir -p $OUTPUT_PATH/final/
 cp lora_out/adapter_config.json $OUTPUT_PATH/final/
