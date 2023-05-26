@@ -103,19 +103,19 @@ if ddp:
     device_map = {"": int(os.environ.get("LOCAL_RANK") or 0)}
     GRADIENT_ACCUMULATION_STEPS = GRADIENT_ACCUMULATION_STEPS // world_size
 
+tokenizer_path = args.tokenizer_path
+if not os.path.exists(args.tokenizer_path + "/tokenizer_config.json"):
+    tokenizer_path = args.model_path
+print("load tokenizer from path:", tokenizer_path)
+tokenizer = LlamaTokenizer.from_pretrained(
+    tokenizer_path, add_eos_token=add_eos_token
+)
+
 print("load model from path:", args.model_path)
 model = LlamaForCausalLM.from_pretrained(
     args.model_path,
     load_in_8bit=True,
     device_map=device_map,
-)
-
-tokenizer_path = args.tokenizer_path
-if not os.path.exists("tokenizer_config.json"):
-    tokenizer_path = args.model_path
-print("load tokenizer from path:", tokenizer_path)
-tokenizer = LlamaTokenizer.from_pretrained(
-    tokenizer_path, add_eos_token=add_eos_token
 )
 
 model = prepare_model_for_int8_training(model)

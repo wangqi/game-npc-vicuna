@@ -11,7 +11,7 @@ OUTPUT_PATH="lora_out"
 MODEL_PATH="models/game_npc_vicuna_base"
 # lora_checkpoint="./checkpoints/chinese-vicuna-lora-7b-belle-and-guanaco"
 TEST_SIZE=0.3
-TOKENIZER_PATH="config/chinese-llama-alpaca/"
+TOKENIZER_PATH="config/chinese_llama_alpaca/"
 
 CUDA_VISIBLE_DEVICES=${TOT_CUDA} torchrun --nproc_per_node=$CUDA_NUM --master_port=$PORT tools/finetune.py \
 --data_path $DATA_PATH \

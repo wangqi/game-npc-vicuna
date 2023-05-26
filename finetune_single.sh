@@ -4,7 +4,7 @@ OUTPUT_PATH="lora_out"
 MODEL_PATH="models/game_npc_vicuna_base"
 # lora_checkpoint="./checkpoints/chinese-vicuna-lora-8b-belle-and-guanaco"
 TEST_SIZE=0.3
-TOKENIZER_PATH="config/chinese-llama-alpaca/"
+TOKENIZER_PATH="config/chinese_llama_alpaca/"
 
 python tools/finetune.py \
 --data_path $DATA_PATH \
