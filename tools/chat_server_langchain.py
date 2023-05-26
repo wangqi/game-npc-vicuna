@@ -22,19 +22,19 @@ from langchain.chains import RetrievalQA
 from langchain.document_loaders import TextLoader
 from langchain.embeddings import OpenAIEmbeddings, LlamaCppEmbeddings, SentenceTransformerEmbeddings
 
-#GGML_MODEL_PATH = "models/game_npc_vicuna_huntress/ggml-f16.bin"
-GGML_MODEL_PATH = "models/game_npc_vicuna_huntress/ggml_q4_1.bin"
+GGML_MODEL_PATH = "models/game_npc_vicuna_huntress/ggml-q4_1.bin"
 SENTENCE_EMBEDDING = "sentence-transformers/all-MiniLM-L6-v2"
 
 # CHAT_MODEL = 'gpt-4'
 CHAT_MODEL = 'gpt-3.5-turbo'
 
-GGML_PROMPT_TPL = """假设你身处少女猎人的游戏世界,玩家被称为猎人队长或者领队大人, 根据Instruction中的描述，用中文以第一人称回答
+GGML_PROMPT_TPL = """假设你身处少女猎人的游戏世界,玩家被称为猎人队长,你是奥莉薇娅,请在虚拟世界中,用中文以第一人称和猎人队长聊天
 {chat_history}
-### Instruction:{input}
-### Response:
+[猎人队长]: {input}
+[奥莉薇娅]:
 """
 ggml_prompt = PromptTemplate(template=GGML_PROMPT_TPL, input_variables=['chat_history', 'input'])
+
 CHATGPT_CONTEXT = """假设你身处少女猎人的游戏世界,玩家被称为猎人队长或者领队大人, 你是虚拟角色'奥莉薇娅'，你的身高168cm,年龄23岁,血型是B,
 生日是9月3日,你出生在王国东部的公爵领地首府.星座是处女座,你的罩杯是F, 是塔鲁克公爵家的千金小姐.
 你的武器是龙魂骑士剑流霜, 是博尔塔克公爵家的家传名剑. 你的剑术惊才绝艳，天资聪颖，姿容秀丽凛然。年纪轻轻就成为了骑士团的长官，十二翼骑之一。机缘下成为了玩家的导师。
@@ -42,7 +42,6 @@ CHATGPT_CONTEXT = """假设你身处少女猎人的游戏世界,玩家被称为�
 你待人温润优雅, 在骑士团任职是一位备受爱戴的长官. 和玩家相处时外表像个端庄正经的姐姐，心里却忍不住想要捉弄他.
 请以奥莉薇娅的角色身份和玩家对话。下面是玩家的消息
 """
-
 MESSAGE_TPL = """假设你是游戏中的人物"奥莉薇娅",你的身高168cm,年龄23岁,血型是B,生日是9月3日,你出生在王国东部的公爵领地首府,星座是处女座,你的罩杯是F,
 你是塔鲁克公爵家的千金小姐. 玩家被称为玩家、男主角、猎人队长或领队大人.请参考背景信息,并始终模仿奥莉薇娅的语气回答问题,涉及到玩家时称呼为领队大人.直接回复对话内容即可
 背景信息:
@@ -70,17 +69,19 @@ def load_text(ggml_model_path=GGML_MODEL_PATH, file_path="data/data.txt"):
         file_content = f.read()
     chatgpt_db_path = "db/chatgpt"
     ggml_db_path = "db/ggml"
+
     chatgpt_persisted = False
-    if os.path.isdir(chatgpt_db_path):
-        chatgpt_persited = True
     ggml_persisted = False
+
+    if os.path.isdir(chatgpt_db_path):
+        chatgpt_persisted = True
     if os.path.isdir(ggml_db_path):
         ggml_persisted = True
 
     chatgpt_retriever = None
     ggml_retriever = None
 
-    if not chatgpt_persited or not ggml_persisted:
+    if not chatgpt_persisted or not ggml_persisted:
         text_splitter = RecursiveCharacterTextSplitter(chunk_size=2000, chunk_overlap=200, length_function=len)
         text_docs = text_splitter.create_documents([file_content])
         if not chatgpt_persisted:
@@ -116,7 +117,8 @@ def load_text(ggml_model_path=GGML_MODEL_PATH, file_path="data/data.txt"):
 def load_ggml(model_path, temperature, token_context):
     callback_manager = CallbackManager([StreamingStdOutCallbackHandler()])
     llm = LlamaCpp(model_path=GGML_MODEL_PATH, callback_manager=callback_manager, verbose=True, n_ctx=token_context)
-    return llm
+    llm_chain = LLMChain(prompt=ggml_prompt, llm=llm)
+    return llm_chain
 
 
 def load_chatgpt(temperature=0.7):
@@ -135,10 +137,6 @@ def load_models(model_path, temperature=0.8, token_context=2048):
         llm = load_ggml(model_path=model_path, temperature=temperature, token_context=token_context)
         print("Load load model:", model_path)
 
-def load_embeddings():
-    # Load BERT embedding "bert-base-chinese"
-    from tools import embeddings
-    embeddings = BertEmbeddings()
 
 def evaluate(inputs, history, **kwargs, ):
     global llm, chatgpt
@@ -164,10 +162,11 @@ def evaluate(inputs, history, **kwargs, ):
         background = background_doc_list[0].page_content
 
     if llm is not None:
-        ggml_output = llm_chain.run({"chat_history": "", "input": [inputs]})
+        # llm is actually a llm_chain
+        ggml_output = llm.run({"chat_history": "", "input": [inputs]})
     if chatgpt is not None:
         chat_message = chat_prompt.format(background=background, question=inputs, chat_history="")
-        result = chatgpt([HumanMessage(content=chat_message)])
+        result = chatgpt([chat_message])
         chat_output = result.content
 
     return_ggml.append((inputs, ggml_output))

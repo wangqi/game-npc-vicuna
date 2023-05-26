@@ -11,7 +11,7 @@ import warnings
 
 assert (
         "LlamaTokenizer" in transformers._import_structure["models.llama"]
-), "LLaMA is now in HuggingFace's main branch.\nPlease reinstall it: pip uninstall transformers && pip install git+https://github.com/huggingface/transformers.git"
+), "LLaMA is now in HuggingFace's main branch.\nPlease reinstall it: pip uninstall transformers && pip install transformers==4.28.1"
 from transformers import LlamaForCausalLM, LlamaTokenizer
 from peft import (
     prepare_model_for_int8_training,
@@ -23,6 +23,7 @@ from peft import (
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--wandb", action="store_true", default=False)
+parser.add_argument("--prompt_path", type=str, default="data/prompt_tpl.txt")
 parser.add_argument("--data_path", type=str, default="data/data.json")
 parser.add_argument("--output_path", type=str, default="models/game_npc_vicuna")
 parser.add_argument("--model_path", type=str, default="models/game_npc_vicuna_base")
@@ -31,35 +32,44 @@ parser.add_argument("--eval_steps", type=int, default=200)
 parser.add_argument("--save_steps", type=int, default=200)
 parser.add_argument("--test_size", type=float, default=0.3)
 parser.add_argument("--resume_from_checkpoint", type=str, default=None)
-parser.add_argument("--ignore_data_skip", type=str, default="False")
-parser.add_argument("--group_by_length", action="store_true", default=False)
+parser.add_argument("--target_models", type=str, default="q_proj,k_proj,v_proj,down_proj,gate_proj,up_proj")
 args = parser.parse_args()
 
 if not args.wandb:
     os.environ["WANDB_MODE"] = "disable"
+
 # optimized for RTX 3090 & 4090. for larger GPUs, increase some of these?
 MICRO_BATCH_SIZE = 8
-BATCH_SIZE = 256
+BATCH_SIZE = 64
 MAX_STEPS = None
 GRADIENT_ACCUMULATION_STEPS = BATCH_SIZE // MICRO_BATCH_SIZE
 EPOCHS = args.num_epochs
-LEARNING_RATE = 3e-4  # the Karpathy constant
-CUTOFF_LEN = 256  # 256 accounts for about 96% of the data
-LORA_R = 16
+#  learning rates of 2e-4, 1e-4, and 5e-5 for the 7B, 13B and 30B models, respectively
+LEARNING_RATE = 1e-4
+CUTOFF_LEN = 512 #256 accounts for about 96% of the data
+# LORA_R is the rank of the low-rank adaptation in the LoRA technique.
+# It determines the size of the low-rank matrix used in the adaptation.
+# A lower rank means a smaller matrix, which requires fewer parameters
+# and less computational resources, but may not capture as much information.
+# Conversely, a higher rank means a larger matrix, which can capture more
+# information but requires more parameters and computational resources.
+LORA_R = 8
+# LORA_ALPHA is the scaling factor for the low-rank adaptation in the LoRA technique.
+# It determines how much the low-rank adaptation contributes to the final output of the model.
+# A higher alpha means the low-rank adaptation contributes more, while a lower alpha means it contributes less.
 LORA_ALPHA = 16
+# LORA_DROPOUT is the dropout rate used in the low-rank adaptation in the LoRA technique.
+# Dropout is a regularization technique that randomly sets a fraction of the input units to 0 during training,
+# which can help prevent overfitting. The LORA_DROPOUT parameter determines the fraction of
+# the input units that are set to 0.
 LORA_DROPOUT = 0.05
-TEST_SET_SIZE = args.test_size  # 2000
-TARGET_MODULES = [
-    "q_proj",
-    "k_proj",
-    "v_proj",
-    "o_proj",
-]
-DATA_PATH = args.data_path  # "/home/cciip/private/fanchenghao/dataset/instruction/merge.json"
-OUTPUT_DIR = args.output_path  # "lora-Vicuna"
-# llm hyperparams
+TEST_SET_SIZE = args.test_size  # 30%
+TARGET_MODULES = args.target_models.split(",")
+DATA_PATH = args.data_path
+OUTPUT_DIR = args.output_path
+
 train_on_inputs: bool = True,  # if False, masks out inputs in loss
-add_eos_token: bool = False,
+add_eos_token: bool = True,
 group_by_length: bool = False,  # faster, but produces an odd training loss curve
 
 print(
@@ -79,12 +89,12 @@ print(
     f"lora_target_modules: {TARGET_MODULES}\n"
     f"train_on_inputs: {train_on_inputs}\n"
     f"add_eos_token: {add_eos_token}\n"
-    f"group_by_length: {args.group_by_length}\n"
     f"resume_from_checkpoint: {args.resume_from_checkpoint or False}\n"
 )
 
 device_map = "auto"
 world_size = int(os.environ.get("WORLD_SIZE", 1))
+# ddp stands for deep learning process
 ddp = world_size != 1
 if ddp:
     device_map = {"": int(os.environ.get("LOCAL_RANK") or 0)}
@@ -98,7 +108,7 @@ model = LlamaForCausalLM.from_pretrained(
 )
 print("load tokenizer from path:", args.model_path)
 tokenizer = LlamaTokenizer.from_pretrained(
-    args.model_path, add_eos_token=True
+    args.model_path, add_eos_token=add_eos_token
 )
 
 model = prepare_model_for_int8_training(model)
@@ -111,16 +121,33 @@ config = LoraConfig(
     bias="none",
     task_type="CAUSAL_LM",
 )
+config.save_pretrained(OUTPUT_DIR)
+
 model = get_peft_model(model, config)
-tokenizer.pad_token_id = 0  # unk. we want this to be different from the eos token
+# unk. we want this to be different from the eos token, config
+tokenizer.pad_token_id = 0
 # tokenizer.padding_side = "left"  # Allow batched inference
 
+total_params, params = 0, 0
+for n, p in model.model.named_parameters():
+    if any([x in n for x in ["lora"]]):
+        total_params += p.numel()
+    params += p.numel()
+
+print(
+    "Total number of parameters: {}M, rate: {}%".format(
+        total_params // 1000 / 1000, round(total_params / params * 100, 2)
+    )
+)
+
+# Load data
 data = load_dataset("json", data_files=DATA_PATH)
 
 TEST_SET_SIZE = int(len(data["train"]) * TEST_SET_SIZE)
 VALUE_SET_SIZE = len(data["train"])  - TEST_SET_SIZE
 now_max_steps = max(VALUE_SET_SIZE // BATCH_SIZE * EPOCHS, EPOCHS)
 print("TEST_SET_SIZE:", TEST_SET_SIZE, "VALUE_SET_SIZE:", VALUE_SET_SIZE, "now_max_steps:", now_max_steps)
+
 if args.resume_from_checkpoint:
     # Check the available weights and load them
     checkpoint_name = os.path.join(args.resume_from_checkpoint, "pytorch_model.bin")  # Full checkpoint
@@ -131,7 +158,7 @@ if args.resume_from_checkpoint:
         if os.path.exists(checkpoint_name):
             os.rename(checkpoint_name, pytorch_bin_path)
             warnings.warn(
-                "The file name of the lora checkpoint'adapter_model.bin' is replaced with 'pytorch_model.bin'")
+                "The file name of the lora checkpoint's adapter_model.bin' is replaced with 'pytorch_model.bin'")
         else:
             args.resume_from_checkpoint = (
                 None  # So the trainer won't try loading its state
@@ -163,28 +190,21 @@ else:
 
 model.print_trainable_parameters()
 
+# Load prompt template
+PROMPT_TEMPLATE = ""
 
 def generate_prompt(data_point):
-    # sorry about the formatting disaster gotta move fast
-    if data_point["input"]:
-        return f"""Below is an instruction that describes a task, paired with an input that provides further context. Write a response that appropriately completes the request.
-
-### Instruction:
-{data_point["instruction"]}
-
-### Input:
-{data_point["input"]}
-
-### Response:
-{data_point["output"]}"""
-    else:
-        return f"""Below is an instruction that describes a task. Write a response that appropriately completes the request.
-
-### Instruction:
-{data_point["instruction"]}
-
-### Response:
-{data_point["output"]}"""
+    global PROMPT_TEMPLATE
+    if len(PROMPT_TEMPLATE) == 0:
+        # use os to check if file exists
+        if os.path.exists(args.prompt_path):
+            with open(args.prompt_path, 'r') as f:
+                PROMPT_TEMPLATE = f.read()
+        else:
+            raise FileNotFoundError(args.prompt_path)
+    user_prompt = PROMPT_TEMPLATE.format(instruction=data_point["instruction"], input=data_point["input"],
+                                         output=data_point["output"])
+    return user_prompt
 
 
 def tokenize(prompt):
@@ -205,30 +225,7 @@ def tokenize(prompt):
 def generate_and_tokenize_prompt(data_point):
     # This function masks out the labels for the input,
     # so that our loss is computed only on the response.
-    user_prompt = (
-        (
-            f"""Below is an instruction that describes a task, paired with an input that provides further context. Write a response that appropriately completes the request.
-
-### Instruction:
-{data_point["instruction"]}
-
-### Input:
-{data_point["input"]}
-
-### Response:
-"""
-        )
-        if data_point["input"]
-        else (
-            f"""Below is an instruction that describes a task. Write a response that appropriately completes the request.
-
-### Instruction:
-{data_point["instruction"]}
-
-### Response:
-"""
-        )
-    )
+    user_prompt = generate_prompt(data_point)
     # print("user_prompt: ", user_prompt)
     len_user_prompt_tokens = (
             len(
@@ -253,7 +250,6 @@ def generate_and_tokenize_prompt(data_point):
         "attention_mask": [1] * (len(full_tokens)),
     }
 
-
 if TEST_SET_SIZE > 0:
     train_val = data["train"].train_test_split(
         test_size=TEST_SET_SIZE, shuffle=True, seed=42
@@ -264,12 +260,14 @@ else:
     train_data = data["train"].shuffle().map(generate_and_tokenize_prompt)
     val_data = None
 
+print("Training dataset size:", len(train_data), ". Validation dataset size:", len(val_data))
 trainer = transformers.Trainer(
     model=model,
     train_dataset=train_data,
     eval_dataset=val_data,
     args=transformers.TrainingArguments(
         per_device_train_batch_size=MICRO_BATCH_SIZE,
+        per_device_eval_batch_size=MICRO_BATCH_SIZE,
         gradient_accumulation_steps=GRADIENT_ACCUMULATION_STEPS,
         warmup_steps=100,
         num_train_epochs=EPOCHS,
@@ -285,8 +283,6 @@ trainer = transformers.Trainer(
         load_best_model_at_end=True if TEST_SET_SIZE > 0 else False,
         ddp_find_unused_parameters=False if ddp else None,
         report_to="wandb" if args.wandb else [],
-        ignore_data_skip=args.ignore_data_skip,
-        group_by_length=args.group_by_length
     ),
     data_collator=transformers.DataCollatorForLanguageModeling(tokenizer, mlm=False)
 )
@@ -302,6 +298,10 @@ if torch.__version__ >= "2" and sys.platform != "win32":
 
 print("\n If there's a warning about missing keys above, please disregard :)")
 
-trainer.train(resume_from_checkpoint=args.resume_from_checkpoint)
+if args.resume_from_checkpoint:
+    print("resume from checkpoint")
+    trainer.train(resume_from_checkpoint=args.resume_from_checkpoint)
+else:
+    trainer.train()
 
 model.save_pretrained(OUTPUT_DIR)

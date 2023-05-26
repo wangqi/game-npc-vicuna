@@ -88,7 +88,7 @@ langchain==0.0.174
 lark==1.1.5
 linkify-it-py==2.0.0
 lit==16.0.2
-llama-cpp-python==0.1.51
+llama-cpp-python==0.1.54
 loralib==0.1.1
 lz4==4.3.2
 markdown-it-py==2.2.0

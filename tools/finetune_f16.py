@@ -36,8 +36,8 @@ parser.add_argument("--wandb", action="store_true", default=False)
 parser.add_argument("--data_path", type=str, default="data/data.json")
 parser.add_argument("--output_path", type=str, default="models/game_npc_vicuna")
 parser.add_argument("--model_path", type=str, default="models/game_npc_vicuna_base")
-parser.add_argument("--prompt_path", type=str, default="samples/prompt_tpl.txt")
-parser.add_argument("--prompt_no_input_path", type=str, default="samples/prompt_tpl_no_input.txt")
+parser.add_argument("--prompt_path", type=str, default="data/prompt_tpl.txt")
+parser.add_argument("--prompt_no_input_path", type=str, default="data/prompt_tpl_no_input.txt")
 parser.add_argument("--num_epochs", type=int, default=3)
 parser.add_argument("--eval_steps", type=int, default=200)
 parser.add_argument("--save_steps", type=int, default=200)
@@ -52,15 +52,29 @@ args = parser.parse_args()
 if not args.wandb:
     os.environ["WANDB_MODE"] = "disable"
 # optimized for RTX 4090. for larger GPUs, increase some of these?
-MICRO_BATCH_SIZE = 4  # this could actually be 5 but i like powers of 2
-BATCH_SIZE = 256
+MICRO_BATCH_SIZE = 4
+BATCH_SIZE = 64
 MAX_STEPS = None
 GRADIENT_ACCUMULATION_STEPS = BATCH_SIZE // MICRO_BATCH_SIZE
 EPOCHS = args.num_epochs  # we don't always need 3 tbh
-LEARNING_RATE = 3e-4  # the Karpathy constant
-CUTOFF_LEN = 256  # 256 accounts for about 96% of the data
+#  learning rates of 2e-4, 1e-4, and 5e-5 for the 7B, 13B and 30B models, respectively
+LEARNING_RATE = 1e-4  # the Karpathy constant
+CUTOFF_LEN = 512
+# LORA_R is the rank of the low-rank adaptation in the LoRA technique.
+# It determines the size of the low-rank matrix used in the adaptation.
+# A lower rank means a smaller matrix, which requires fewer parameters
+# and less computational resources, but may not capture as much information.
+# Conversely, a higher rank means a larger matrix, which can capture more
+# information but requires more parameters and computational resources.
 LORA_R = 8
+# LORA_ALPHA is the scaling factor for the low-rank adaptation in the LoRA technique.
+# It determines how much the low-rank adaptation contributes to the final output of the model.
+# A higher alpha means the low-rank adaptation contributes more, while a lower alpha means it contributes less.
 LORA_ALPHA = 16
+# LORA_DROPOUT is the dropout rate used in the low-rank adaptation in the LoRA technique.
+# Dropout is a regularization technique that randomly sets a fraction of the input units to 0 during training,
+# which can help prevent overfitting. The LORA_DROPOUT parameter determines the fraction of
+# the input units that are set to 0.
 LORA_DROPOUT = 0.05
 TEST_SET_SIZE = args.test_size  # 30%
 TARGET_MODULES = args.target_models.split(",")
@@ -128,12 +142,25 @@ model = get_peft_model(model, config)
 tokenizer.pad_token_id = 0  # unk. we want this to be different from the eos token
 # tokenizer.padding_side = "left"  # Allow batched inference
 
+total_params, params = 0, 0
+for n, p in model.model.named_parameters():
+    if any([x in n for x in ["lora"]]):
+        total_params += p.numel()
+    params += p.numel()
+
+print(
+    "Total number of parameters: {}M, rate: {}%".format(
+        total_params // 1000 / 1000, round(total_params / params * 100, 2)
+    )
+)
+
 data = load_dataset("json", data_files=DATA_PATH)
 
 #now_max_steps = max((len(data["train"]) - VAL_SET_SIZE) // BATCH_SIZE * EPOCHS, EPOCHS)
 TEST_SET_SIZE = int(len(data["train"]) * TEST_SET_SIZE)
 VALUE_SET_SIZE = len(data["train"])  - TEST_SET_SIZE
 now_max_steps = max(VALUE_SET_SIZE // BATCH_SIZE * EPOCHS, EPOCHS)
+
 if args.resume_from_checkpoint:
     # Check the available weights and load them
     checkpoint_name = os.path.join(args.resume_from_checkpoint, "pytorch_model.bin")  # Full checkpoint
@@ -145,7 +172,7 @@ if args.resume_from_checkpoint:
         if os.path.exists(checkpoint_name):
             os.rename(checkpoint_name, pytorch_bin_path)
             warnings.warn(
-                "The file name of the lora checkpoint'adapter_model.bin' is replaced with 'pytorch_model.bin'")
+                "The file name of the lora checkpoint's adapter_model.bin' is replaced with 'pytorch_model.bin'")
         else:
             args.resume_from_checkpoint = (
                 None  # So the trainer won't try loading its state
@@ -265,6 +292,8 @@ if TEST_SET_SIZE > 0:
 else:
     train_data = data["train"].shuffle().map(generate_and_tokenize_prompt)
     val_data = None
+
+print("Training dataset size:", len(train_data), ". Validation dataset size:", len(val_data))
 trainer = transformers.Trainer(
     model=model,
     train_dataset=train_data,
