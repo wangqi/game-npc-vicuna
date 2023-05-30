@@ -41,8 +41,9 @@ class BertEmbeddings(BaseModel, Embeddings):
         from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
         from transformers import BertConfig
 
-        bert_config = BertConfig(max_position_embeddings=4096)
-        tokenizer = AutoTokenizer.from_pretrained(self.model_name, config=bert_config)
+        bert_config = BertConfig.from_pretrained(self.model_name)
+        # bert_config.output_hidden_states = True
+        tokenizer = AutoTokenizer.from_pretrained(self.model_name, config=bert_config, device_map="auto")
         model = AutoModelForCausalLM.from_pretrained(self.model_name, config=bert_config)
         self.client = pipeline("feature-extraction", model=model, tokenizer=tokenizer)
 

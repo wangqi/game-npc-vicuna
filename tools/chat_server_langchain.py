@@ -166,7 +166,7 @@ def evaluate(inputs, history, **kwargs, ):
         ggml_output = llm.run({"chat_history": "", "input": [inputs]})
     if chatgpt is not None:
         chat_message = chat_prompt.format(background=background, question=inputs, chat_history="")
-        result = chatgpt([chat_message])
+        result = chatgpt([HumanMessage(content=chat_message)])
         chat_output = result.content
 
     return_ggml.append((inputs, ggml_output))

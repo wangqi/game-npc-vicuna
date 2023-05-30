@@ -1,63 +1,13 @@
-#BASE_MODEL="models/huggyllama_chinese-vicuna-7b-3epock-belle-guanaco/"
-#BASE_MODEL="decapoda-research/llama-7b-hf"
-#LORA_PATH="Chinese-Vicuna/Chinese-Vicuna-lora-7b-belle-and-guanaco"
-#LORA_PATH="Facico/Chinese-Vicuna-lora-7b-3epoch-belle-and-guanaco"
-#BASE_MODEL="models/game_npc_vicuna_base"
-#BASE_MODEL="models/huggyllama_chinese-vicuna-7b-3epock-belle-guanaco-chinese-llama-alpaca"
-#LORA_PATH="lora_out/final" #"checkpoint-6000"
 
-MODEL_TOKEN="config"
+# python ../lm-evaluation-harness/main.py \
+#     --model hf-causal-experimental \
+#     --model_args pretrained=EleutherAI/gpt-j-6b,peft=nomic-ai/gpt4all-j-lora \
+#     --tasks openbookqa,arc_easy,winogrande,hellaswag,arc_challenge,piqa,boolq \
+#     --device cuda:0
 
-echo ""
-echo ""
-echo "------------------------------------------------------"
-BASE_MODEL="models/huggyllama_chinese-alpaca-plus-lora-7b-vicuna"
-echo "BASE_MODEL: $BASE_MODEL; LORA_MODEL: "
-python test/test.py --base_model $BASE_MODEL --model_token $BASE_MODEL
-
-echo ""
-echo ""
-echo "------------------------------------------------------"
-BASE_MODEL="models/huggyllama_chinese-alpaca-plus-lora-7b"
-echo "BASE_MODEL: $BASE_MODEL; LORA_MODEL: "
-python test/test.py --base_model $BASE_MODEL --model_token $BASE_MODEL
-exit(0)
-
-echo ""
-echo ""
-echo "------------------------------------------------------"
-BASE_MODEL="huggyllama/llama-7b"
-LORA_MODEL="ziqingyang/chinese-alpaca-plus-lora-7b"
-echo "BASE_MODEL: $BASE_MODEL; LORA_MODEL: $LORA_MODEL"
-python test/test.py --base_model $BASE_MODEL --lora_model $LORA_MODEL --model_token $MODEL_TOKEN --use_lora
-
-echo ""
-echo ""
-echo "------------------------------------------------------"
-BASE_MODEL="decapoda-research/llama-7b-hf"
-LORA_MODEL="ziqingyang/chinese-alpaca-plus-lora-7b"
-echo "BASE_MODEL: $BASE_MODEL; LORA_MODEL: $LORA_MODEL"
-python test/test.py --base_model $BASE_MODEL --lora_model $LORA_MODEL --model_token $MODEL_TOKEN --use_lora
-
-echo ""
-echo ""
-echo "------------------------------------------------------"
-BASE_MODEL="huggyllama/llama-7b"
-LORA_MODEL="Chinese-Vicuna/Chinese-Vicuna-lora-7b-belle-and-guanaco"
-echo "BASE_MODEL: $BASE_MODEL; LORA_MODEL: $LORA_MODEL"
-python test/test.py --base_model $BASE_MODEL --lora_model $LORA_MODEL --model_token $MODEL_TOKEN --use_lora
-
-echo ""
-echo ""
-echo "------------------------------------------------------"
-BASE_MODEL="huggyllama/llama-7b"
-LORA_MODEL="Facico/Chinese-Vicuna-lora-7b-3epoch-belle-and-guanaco"
-echo "BASE_MODEL: $BASE_MODEL; LORA_MODEL: $LORA_MODEL"
-python test/test.py --base_model $BASE_MODEL --lora_model $LORA_MODEL --model_token $MODEL_TOKEN --use_lora
-
-echo ""
-echo ""
-echo "------------------------------------------------------"
-BASE_MODEL="models/huggyllama_chinese-vicuna-7b-3epock-belle-guanaco-chinese-llama-alpaca"
-echo "BASE_MODEL: $BASE_MODEL; LORA_MODEL: $LORA_MODEL"
-python test/test.py --base_model $BASE_MODEL --model_token $MODEL_TOKEN
+python ../lm-evaluation-harness/main.py \
+    --model hf-causal \
+    --model_args pretrained=models/game_npc_vicuna_base \
+    # --tasks arc_challenge,hellaswag,hendrycksTest-abstract_algebra,hendrycksTest-anatomy,hendrycksTest-astronomy,hendrycksTest-business_ethics,hendrycksTest-clinical_knowledge,hendrycksTest-college_biology,hendrycksTest-college_chemistry,hendrycksTest-college_computer_science,hendrycksTest-college_mathematics,hendrycksTest-college_medicine,hendrycksTest-college_physics,hendrycksTest-computer_security,hendrycksTest-conceptual_physics,hendrycksTest-econometrics,hendrycksTest-electrical_engineering,hendrycksTest-elementary_mathematics,hendrycksTest-formal_logic,hendrycksTest-global_facts,hendrycksTest-high_school_biology,hendrycksTest-high_school_chemistry,hendrycksTest-high_school_computer_science,hendrycksTest-high_school_european_history,hendrycksTest-high_school_geography,hendrycksTest-high_school_government_and_politics,hendrycksTest-high_school_macroeconomics,hendrycksTest-high_school_mathematics,hendrycksTest-high_school_microeconomics,hendrycksTest-high_school_physics,hendrycksTest-high_school_psychology,hendrycksTest-high_school_statistics,hendrycksTest-high_school_us_history,hendrycksTest-high_school_world_history,hendrycksTest-human_aging,hendrycksTest-human_sexuality,hendrycksTest-international_law,hendrycksTest-jurisprudence,hendrycksTest-logical_fallacies,hendrycksTest-machine_learning,hendrycksTest-management,hendrycksTest-marketing,hendrycksTest-medical_genetics,hendrycksTest-miscellaneous,hendrycksTest-moral_disputes,hendrycksTest-moral_scenarios,hendrycksTest-nutrition,hendrycksTest-philosophy,hendrycksTest-prehistory,hendrycksTest-professional_accounting,hendrycksTest-professional_law,hendrycksTest-professional_medicine,hendrycksTest-professional_psychology,hendrycksTest-public_relations,hendrycksTest-security_studies,hendrycksTest-sociology,hendrycksTest-us_foreign_policy,hendrycksTest-virology,hendrycksTest-world_religions,truthfulqa_mc\
+    --tasks arc_challenge,truthfulqa_mc \
+    --device cuda:0
