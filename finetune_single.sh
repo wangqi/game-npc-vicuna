@@ -14,7 +14,7 @@ python tools/finetune.py \
 --save_steps 200 \
 --test_size $TEST_SIZE \
 --prompt_path data/train_tpl.txt \
---target_models q_proj,k_proj,v_proj,down_proj,gate_proj,up_proj \
+--target_models q_proj,k_proj,v_proj \
 --tokenizer_path $TOKENIZER_PATH
 
 mkdir -p $OUTPUT_PATH/final/

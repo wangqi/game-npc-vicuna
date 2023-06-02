@@ -5,7 +5,7 @@ import json
 import gradio as gr
 import argparse
 import warnings
-import os
+import os, textwrap
 
 from langchain.chat_models import ChatOpenAI
 from langchain.llms import LlamaCpp
@@ -21,29 +21,25 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.chains import RetrievalQA
 from langchain.document_loaders import TextLoader
 from langchain.embeddings import OpenAIEmbeddings, LlamaCppEmbeddings, SentenceTransformerEmbeddings
+from langchain import HuggingFacePipeline
 
 GGML_MODEL_PATH = "models/game_npc_vicuna_huntress/ggml-q4_1.bin"
-SENTENCE_EMBEDDING = "sentence-transformers/all-MiniLM-L6-v2"
+HF_MODEL_PATH = "models/wizard-mega_chinese-alpaca-plus-lora-13b"
+SENTENCE_EMBEDDING = "shibing624/text2vec-base-chinese"
 
-# CHAT_MODEL = 'gpt-4'
-CHAT_MODEL = 'gpt-3.5-turbo'
+CHAT_MODEL = 'gpt-4'
+# CHAT_MODEL = 'gpt-3.5-turbo'
 
 GGML_PROMPT_TPL = """假设你身处少女猎人的游戏世界,玩家被称为猎人队长,你是奥莉薇娅,请在虚拟世界中,用中文以第一人称和猎人队长聊天
+背景信息:
+{background}
+聊天历史:
 {chat_history}
-[猎人队长]: {input}
-[奥莉薇娅]:
+[猎人队长]: {question}
 """
-ggml_prompt = PromptTemplate(template=GGML_PROMPT_TPL, input_variables=['chat_history', 'input'])
 
-CHATGPT_CONTEXT = """假设你身处少女猎人的游戏世界,玩家被称为猎人队长或者领队大人, 你是虚拟角色'奥莉薇娅'，你的身高168cm,年龄23岁,血型是B,
-生日是9月3日,你出生在王国东部的公爵领地首府.星座是处女座,你的罩杯是F, 是塔鲁克公爵家的千金小姐.
-你的武器是龙魂骑士剑流霜, 是博尔塔克公爵家的家传名剑. 你的剑术惊才绝艳，天资聪颖，姿容秀丽凛然。年纪轻轻就成为了骑士团的长官，十二翼骑之一。机缘下成为了玩家的导师。
-你的人生目标:想看到玩家成长的未来，甚至有些暧昧的感情。偶尔也会做出些逾越师徒规矩的踩线举止, 但碍于两人的身份和教官的自律操守，你也只保持这样的距离。
-你待人温润优雅, 在骑士团任职是一位备受爱戴的长官. 和玩家相处时外表像个端庄正经的姐姐，心里却忍不住想要捉弄他.
-请以奥莉薇娅的角色身份和玩家对话。下面是玩家的消息
-"""
-MESSAGE_TPL = """假设你是游戏中的人物"奥莉薇娅",你的身高168cm,年龄23岁,血型是B,生日是9月3日,你出生在王国东部的公爵领地首府,星座是处女座,你的罩杯是F,
-你是塔鲁克公爵家的千金小姐. 玩家被称为玩家、男主角、猎人队长或领队大人.请参考背景信息,并始终模仿奥莉薇娅的语气回答问题,涉及到玩家时称呼为领队大人.直接回复对话内容即可
+MESSAGE_TPL = """假设你是游戏中的人物"奥莉薇娅",是塔鲁克公爵家的千金小姐.玩家是猎人队长.请参考背景信息,并始终模仿奥莉薇娅的语气回答问题,
+直接回复对话内容即可. 
 背景信息:
 {background}
 聊天历史:
@@ -52,7 +48,8 @@ MESSAGE_TPL = """假设你是游戏中的人物"奥莉薇娅",你的身高168cm,
 {question}
 """
 
-chat_prompt = PromptTemplate(input_variables=['background', 'question', 'chat_history'], template=MESSAGE_TPL)
+# chat_prompt = PromptTemplate(input_variables=['background', 'question', 'chat_history'], template=MESSAGE_TPL)
+# ggml_prompt = PromptTemplate(input_variables=['background', 'question', 'chat_history'], template=GGML_PROMPT_TPL)
 
 openai_key = os.environ.get('$OPENAI_API_KEY')
 if openai_key is not None:
@@ -74,8 +71,14 @@ def load_text(ggml_model_path=GGML_MODEL_PATH, file_path="data/data.txt"):
     ggml_persisted = False
 
     if os.path.isdir(chatgpt_db_path):
+        # Convert to absolute path
+        chatgpt_db_path = os.path.abspath(chatgpt_db_path)
+        print("found chatgpt db at path:", chatgpt_db_path)
         chatgpt_persisted = True
     if os.path.isdir(ggml_db_path):
+        # Convert to absolute path
+        ggml_db_path = os.path.abspath(ggml_db_path)
+        print("found ggml db at path:", ggml_db_path)
         ggml_persisted = True
 
     chatgpt_retriever = None
@@ -84,45 +87,50 @@ def load_text(ggml_model_path=GGML_MODEL_PATH, file_path="data/data.txt"):
     if not chatgpt_persisted or not ggml_persisted:
         text_splitter = RecursiveCharacterTextSplitter(chunk_size=2000, chunk_overlap=200, length_function=len)
         text_docs = text_splitter.create_documents([file_content])
+        print("total docs:", len(text_docs))
         if not chatgpt_persisted:
             openai_embeddings = OpenAIEmbeddings()
-            chatgpt_db = Chroma.from_documents(text_docs, openai_embeddings, persist_directory="db/chatgpt")
+            chatgpt_db = Chroma.from_documents(text_docs, openai_embeddings, persist_directory=chatgpt_db_path)
             chatgpt_db.persist()
             chatgpt_retriever = chatgpt_db.as_retriever()
-            # chatgpt_index = VectorstoreIndexCreator(vectorstore_cls=Chroma, embedding=OpenAIEmbeddings(),
-            #                                         text_splitter=text_splitter,
-            #                                         vectorstore_kwargs={"persist_directory": "db/chatgpt"})
         if not ggml_persisted:
-            # ggml_embeddings = LlamaCppEmbeddings(model_path=ggml_model_path, n_ctx=2048)
             ggml_embeddings = SentenceTransformerEmbeddings(model_name=SENTENCE_EMBEDDING)
             print("create ggml embeddings")
-            ggml_db = Chroma.from_documents(documents=text_docs, embedding=ggml_embeddings, persist_directory="db/ggml")
+            ggml_db = Chroma.from_documents(documents=text_docs, embedding=ggml_embeddings, persist_directory=ggml_db_path)
             print("create ggml db")
             ggml_db.persist()
-            ggml_retriever = ggml_db.as_retriever()
-            # ggml_index = VectorstoreIndexCreator(vectorstore_cls=Chroma, embedding=ggml_embeddings,
-            #                                      text_splitter=text_splitter,
-            #                                      vectorstore_kwargs={"persist_directory": "db/ggml"})
+            ggml_retriever = ggml_db.as_retriever(search_type="mmr")
+
     else:
         print("Load ChromaDB from persisted path")
         openai_embeddings = OpenAIEmbeddings()
         chatgpt_db = Chroma(persist_directory=chatgpt_db_path, embedding_function=openai_embeddings)
-        chatgpt_retriever = chatgpt_db.as_retriever(search_kwargs={"k": 1})
+        chatgpt_retriever = chatgpt_db.as_retriever()
+        print("Load ggml chromadb from ", ggml_db_path, " with embeddings:", SENTENCE_EMBEDDING)
         ggml_embeddings = SentenceTransformerEmbeddings(model_name=SENTENCE_EMBEDDING)
         ggml_db = Chroma(persist_directory=ggml_db_path, embedding_function=ggml_embeddings)
-        ggml_retriever = ggml_db.as_retriever(search_kwargs={"k": 1})
+        ggml_retriever = ggml_db.as_retriever(search_type="mmr")
 
     return chatgpt_retriever, ggml_retriever
 
 def load_ggml(model_path, temperature, token_context):
     callback_manager = CallbackManager([StreamingStdOutCallbackHandler()])
     llm = LlamaCpp(model_path=GGML_MODEL_PATH, callback_manager=callback_manager, verbose=True, n_ctx=token_context)
-    llm_chain = LLMChain(prompt=ggml_prompt, llm=llm)
-    return llm_chain
-
+    # llm_chain = LLMChain(prompt=ggml_prompt, llm=llm)
+    # return llm_chain
+    return llm
 
 def load_chatgpt(temperature=0.7):
-    llm = OpenAI(temperature=temperature, model=CHAT_MODEL)
+    llm = ChatOpenAI(temperature=temperature, model=CHAT_MODEL)
+    return llm
+
+def load_hf(model_path, temperature, token_context):
+    llm = HuggingFacePipeline.from_model_id(model_id=model_path, task="text-generation",
+                                            model_kwargs={"temperature":temperature,
+                                                          "max_length":token_context,
+                                                          "load_in_8bit":True,
+                                                          "torch_dtype":torch.float16,
+                                                          "device_map":'cpu'})
     return llm
 
 
@@ -134,14 +142,27 @@ def load_models(model_path, temperature=0.8, token_context=2048):
         chatgpt = load_chatgpt(temperature=temperature)
         print("Load ChatGPT:", CHAT_MODEL)
     if llm is None:
-        llm = load_ggml(model_path=model_path, temperature=temperature, token_context=token_context)
-        print("Load load model:", model_path)
+        # llm = load_ggml(model_path=model_path, temperature=temperature, token_context=token_context)
+        llm = load_hf(model_path=model_path, temperature=temperature, token_context=token_context)
+        print("Load hf load model:", model_path)
 
 
-def evaluate(inputs, history, **kwargs, ):
+def query_retriever(query, retriever, use_textwrap=True):
+    # Load background docs if possible
+    background_doc_list = retriever.get_relevant_documents(query=query)
+    if len(background_doc_list) > 0:
+        background = background_doc_list[0].page_content
+        if use_textwrap:
+            return "\n".join(textwrap.wrap(background, width=80))
+        return background
+    return ""
+
+
+def evaluate(inputs, history, prompt, enable_background, enable_history, **kwargs, ):
     global llm, chatgpt
 
     history = [] if history is None else history
+    print("history:", history)
     # Get the old input & output for displaying in the chatbot field
     return_ggml = []
     return_gpt = []
@@ -151,20 +172,34 @@ def evaluate(inputs, history, **kwargs, ):
         old_chat_output = item['chat_output']
         return_ggml.append((old_input, old_ggml_output))
         return_gpt.append((old_input, old_chat_output))
+    print("return_ggml:", return_ggml)
+    print("return_gpt:", return_gpt)
 
     ggml_output = ""
     chat_output = ""
 
-    # Load background docs if possible
-    background_doc_list = chatgpt_retriever.get_relevant_documents(query=inputs)
-    background = ""
-    if len(background_doc_list) > 0:
-        background = background_doc_list[0].page_content
+    if prompt is None or len(prompt) == 0:
+        prompt = "{background}{chat_history}{question}"
+    chat_prompt = PromptTemplate(input_variables=['background', 'question', 'chat_history'], template=prompt)
 
     if llm is not None:
         # llm is actually a llm_chain
-        ggml_output = llm.run({"chat_history": "", "input": [inputs]})
+        if enable_background:
+            background = query_retriever(query=inputs, retriever=ggml_retriever, use_textwrap=True)
+            if len(background) > 256:
+                background = background[:256]
+        else:
+            background = ""
+        llm_chain = LLMChain(prompt=chat_prompt, llm=llm)
+        print("ggml background:", background)
+        ggml_output = llm_chain.run({"background": background, "chat_history": "", "question": [inputs]})
     if chatgpt is not None:
+        # Load background docs if possible
+        if enable_background:
+            background = query_retriever(query=inputs, retriever=chatgpt_retriever, use_textwrap=True)
+        else:
+            background = ""
+        print("chatgpt background:", background)
         chat_message = chat_prompt.format(background=background, question=inputs, chat_history="")
         result = chatgpt([HumanMessage(content=chat_message)])
         chat_output = result.content
@@ -185,11 +220,31 @@ with gr.Blocks() as demo:
     with gr.Row().style(equal_height=False):
         with gr.Column(variant="panel"):
             with gr.Row():
-                gr_model_path = gr.Label('ggml-f16.bin')
+                gr_model_path = gr.Label(HF_MODEL_PATH.replace("models/", "")[0:8])
                 if openai_key is not None:
-                    gr_chat_gpt = gr.Label("ChatGPT 4.0", caption=openai_key)
+                    if CHAT_MODEL == "gpt-3.5-turbo":
+                        gr_chat_gpt = gr.Label("ChatGPT 3.5", caption=openai_key)
+                    else:
+                        gr_chat_gpt = gr.Label("ChatGPT 4.0", caption=openai_key)
                 else:
-                    gr_chat_gpt = gr.Label("ChatGPT 4.0")
+                    if CHAT_MODEL == "gpt-3.5-turbo":
+                        gr_chat_gpt = gr.Label("ChatGPT 3.5")
+                    else:
+                        gr_chat_gpt = gr.Label("ChatGPT 4.0")
+
+            with gr.Row():
+                gr_prompt_input = gr.components.Textbox(
+                    lines=4, label="Prompt", placeholder="", value="""假设你是游戏中的人物"奥莉薇娅",是塔鲁克公爵家的千金小姐.玩家是猎人队长.请参考背景信息,并始终模仿奥莉薇娅的语气回答问题,直接回复对话内容即可.
+背景信息:
+{background}
+聊天历史:
+{chat_history}
+[猎人队长]: {question}"""
+                )
+
+            with gr.Row():
+                gr_enable_background_checkbox = gr.Checkbox(label="启用背景", value=True)
+                gr_enable_history_checkbox = gr.Checkbox(label="启用历史", value=False)
 
             with gr.Row():
                 with gr.Column():
@@ -197,8 +252,8 @@ with gr.Blocks() as demo:
                         lines=2, label="Input", placeholder=">", value="早上好"
                     )
                     csv_flagged_components.append(gr_input)
-                    input_components = [ gr_input, gr_history]
-                    input_components_except_states = [gr_input]
+                    input_components = [ gr_input, gr_history, gr_prompt_input, gr_enable_background_checkbox, gr_enable_history_checkbox ]
+                    input_components_except_states = [gr_input, gr_prompt_input, gr_enable_background_checkbox, gr_enable_history_checkbox]
 
             with gr.Row():
                 cancel_btn = gr.Button('取消')
@@ -291,7 +346,7 @@ with gr.Blocks() as demo:
         clear_history.click(lambda: (None, None, None), None, [gr_history, ggml_chatbot, gpt_chatbot], queue=False)
 
 chatgpt_retriever, ggml_retriever = load_text()
-load_models(model_path=GGML_MODEL_PATH)
+load_models(model_path=HF_MODEL_PATH)
 print("load models")
 
 demo.queue(concurrency_count=1, status_update_rate="auto").launch(share=share_link, inbrowser=False)

@@ -1,9 +1,9 @@
 # Assign the first command line argument to a variable or use a default value
 BASE_MODEL="${1:-"openaccess-ai-collective/wizard-mega-13b"}"
-LORA_WEIGHT="${2:-"ziqingyang/chinese-llama-plus-lora-13b,ziqingyang/chinese-alpaca-plus-lora-13b"}"
-MODEL_PATH="${3:-"models/wizard-mega_chinese-alpaca-plus-lora-13b"}"
+MODEL_PATH="${2:-"models/wizard-mega_chinese-alpaca-plus-lora-13b"}"
+LORA_WEIGHT="${3:-"ziqingyang/chinese-llama-plus-lora-13b,ziqingyang/chinese-alpaca-plus-lora-13b"}"
 OUT_TYPE="f16"
-QUANT_TYPE="q4_1"
+QUANT_TYPE="q5_0"
 
 mkdir -p $MODEL_PATH
 echo "The BASE_MODEL is: $BASE_MODEL"
@@ -12,7 +12,7 @@ echo "The output model path is: $MODEL_PATH, the output type is: $OUT_TYPE"
 
 echo "Merge the base '$BASE_MODEL' with '$LORA_WEIGHT' LoRA weight"
 echo python tools/merge/merge_llama_with_chinese_lora.py --base_model $BASE_MODEL --lora_model $LORA_WEIGHT --output_dir $MODEL_PATH
-python tools/merge/merge_llama_with_chinese_lora.py --base_model $BASE_MODEL --lora_model $LORA_WEIGHT --output_dir $MODEL_PATH
+#python tools/merge/merge_llama_with_chinese_lora.py --base_model $BASE_MODEL --lora_model $LORA_WEIGHT --output_dir $MODEL_PATH
 
 echo python tools/convert_ggml.py --outtype $OUT_TYPE --outfile $MODEL_PATH/ggml-$OUT_TYPE.bin $MODEL_PATH/consolidated.00.pth
 python tools/convert_ggml.py --outtype $OUT_TYPE --outfile $MODEL_PATH/ggml-$OUT_TYPE.bin $MODEL_PATH/consolidated.00.pth

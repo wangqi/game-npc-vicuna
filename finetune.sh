@@ -23,6 +23,7 @@ CUDA_VISIBLE_DEVICES=${TOT_CUDA} torchrun --nproc_per_node=$CUDA_NUM --master_po
 --prompt_path data/train_tpl.txt \
 --micro_batch_size 16 \
 --batch_size 64 \
+--target_models q_proj,k_proj,v_proj \
 --tokenizer_path $TOKENIZER_PATH
 
 mkdir -p $OUTPUT_PATH/final/

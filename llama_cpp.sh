@@ -1,10 +1,16 @@
 #!/bin/bash
 
 MODEL_NAME="${1:-"game_npc_vicuna_base"}"
-MODEL="models/$MODEL_NAME/ggml-q4_1.bin}"
-PROMPT_TEMPLATE=${PROMPT_TEMPLATE:-./data/chat_vicuna.txt}
-USER_NAME="${USER_NAME:-猎人队长}"
-AI_NAME="${AI_NAME:-奥莉薇娅}"
+MODEL="models/$MODEL_NAME/ggml-q4_1.bin"
+PROMPT_FILE_NAME="${2:-"prompt_en.txt"}"
+PROMPT_TEMPLATE=${PROMPT_TEMPLATE:-./data/$PROMPT_FILE_NAME}
+USER_NAME="${3:-"### User"}"
+AI_NAME="${4:-"### AI"}"
+
+echo "MODEL: $MODEL"
+echo "PROMPT_TEMPLATE: $PROMPT_TEMPLATE"
+echo "USER_NAME: $USER_NAME"
+echo "AI_NAME: $AI_NAME"
 
 # Adjust to the number of CPU cores you want to use.
 N_THREAD="${N_THREAD:-8}"
@@ -18,13 +24,16 @@ GEN_OPTIONS="${GEN_OPTIONS:---ctx_size 512 --temp 0.7 --top_k 40 --top_p 0.5 --r
 DATE_TIME=$(date +%H:%M)
 DATE_YEAR=$(date +%Y)
 
-PROMPT_FILE=$(mktemp -t llamacpp_prompt.XXXXXXX.txt)
+TEMP_PROMPT_FILE=$(mktemp -t llamacpp_prompt.XXXXXXX.txt)
 
 sed -e "s/\[\[USER_NAME\]\]/$USER_NAME/g" \
     -e "s/\[\[AI_NAME\]\]/$AI_NAME/g" \
     -e "s/\[\[DATE_TIME\]\]/$DATE_TIME/g" \
     -e "s/\[\[DATE_YEAR\]\]/$DATE_YEAR/g" \
-     $PROMPT_TEMPLATE > $PROMPT_FILE
+     $PROMPT_TEMPLATE > $TEMP_PROMPT_FILE
+
+echo "Generating with prompt: $TEMP_PROMPT_FILE"
+cat $TEMP_PROMPT_FILE
 
 # shellcheck disable=SC2086 # Intended splitting of GEN_OPTIONS
 ./tools/llama $GEN_OPTIONS \
@@ -33,8 +42,8 @@ sed -e "s/\[\[USER_NAME\]\]/$USER_NAME/g" \
   --threads "$N_THREAD" \
   --n_predict "$N_PREDICTS" \
   --color --interactive \
-  --file ${PROMPT_FILE} \
-  --reverse-prompt "${USER_NAME}:"
+  --file $TEMP_PROMPT_FILE \
+  --reverse-prompt "$USER_NAME:"
   "$@"
 
 #usage: ./tools/llama [options]
