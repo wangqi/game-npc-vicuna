@@ -19,10 +19,11 @@ CUDA_VISIBLE_DEVICES=${TOT_CUDA} torchrun --nproc_per_node=$CUDA_NUM --master_po
 --save_steps 200 \
 --test_size $TEST_SIZE \
 --prompt_path data/train_tpl.txt \
---micro_batch_size 16 \
+--micro_batch_size 8 \
 --batch_size 64 \
 --target_models q_proj,k_proj,v_proj \
---tokenizer_path $TOKENIZER_PATH
+--tokenizer_path $TOKENIZER_PATH \
+--offload_dir /data/offload_dir
 
 mkdir -p $OUTPUT_PATH/final/
 cp adapter_config.json $OUTPUT_PATH/final/

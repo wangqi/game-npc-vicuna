@@ -37,6 +37,9 @@ parser.add_argument("--resume_from_checkpoint", type=str, default=None)
 parser.add_argument("--target_models", type=str, default="q_proj,k_proj,v_proj")
 parser.add_argument("--micro_batch_size", type=int, default=8)
 parser.add_argument("--batch_size", type=int, default=64)
+parser.add_argument('--offload_dir', default="/mnt/c/offload_dir", type=str,
+                    help="(Optional) Please specify a temp folder for offloading (useful for low-RAM machines). "
+                         "Default None (disable offload).")
 args = parser.parse_args()
 
 if not args.wandb:
@@ -94,6 +97,7 @@ print(
     f"train_on_inputs: {train_on_inputs}\n"
     f"add_eos_token: {add_eos_token}\n"
     f"resume_from_checkpoint: {args.resume_from_checkpoint or False}\n"
+    f"offload_dir: {args.offload_dir}\n"
 )
 
 device_map = "auto"
@@ -115,12 +119,21 @@ tokenizer = LlamaTokenizer.from_pretrained(
 print("load model from path:", args.model_path)
 max_memory=f'{int(torch.cuda.mem_get_info()[0]/1024**3)-2}GB'
 print("GPU max memory:", max_memory)
-model = LlamaForCausalLM.from_pretrained(
-    args.model_path,
-    load_in_8bit=True,
-    device_map=device_map,
-    max_memory=max_memory
-)
+if args.offload_dir is not None:
+    print("Load model with offload_dir:", args.offload_dir)
+    model = LlamaForCausalLM.from_pretrained(
+        args.model_path,
+        load_in_8bit=True,
+        device_map=device_map,
+        offload_folder=args.offload_dir,
+        offload_state_dict=True,
+    )
+else:
+    model = LlamaForCausalLM.from_pretrained(
+        args.model_path,
+        load_in_8bit=True,
+        device_map=device_map,
+    )
 
 model = prepare_model_for_int8_training(model)
 

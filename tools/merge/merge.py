@@ -18,7 +18,8 @@ parser.add_argument('--lora_model', default="lora_out/final", required=True,
 parser.add_argument('--lora_token', default="config", required=True,
                     type=str, help="Please specify a lora_model")
 parser.add_argument('--offload_dir', default="/mnt/c/offload_dir", type=str,
-                    help="(Optional) Please specify a temp folder for offloading (useful for low-RAM machines). Default None (disable offload).")
+                    help="(Optional) Please specify a temp folder for offloading (useful for low-RAM machines). "
+                         "Default None (disable offload).")
 parser.add_argument('--output_dir', default='./models/', type=str)
 args = parser.parse_args()
 
