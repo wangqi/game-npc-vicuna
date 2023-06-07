@@ -1,8 +1,8 @@
-BASE_MODEL="models/openaccess-ai-collective_wizard-mega-13b"
-LORA_WEIGHT="${1:-"lora_out/huntress-7b"}"
+BASE_MODEL="models/game_npc_vicuna_base"
+LORA_WEIGHT="${1:-"lora_out/final/"}"
 MODEL_PATH="models/game_npc_vicuna_huntress"
 OUT_TYPE="f16"
-QUANT_TYPE="q4_1"
+QUANT_TYPE="q5_0"
 
 #echo "Merge the game_npc_vicuna_base model with fine-tuned weight at $LORA_PATH to $MODEL_PATH"
 #python tools/merge.py --base_model $BASE_MODEL --lora_model $LORA_WEIGHT \

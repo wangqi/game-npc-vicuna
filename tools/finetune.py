@@ -131,8 +131,9 @@ config = LoraConfig(
 config.save_pretrained(OUTPUT_DIR)
 
 model = get_peft_model(model, config)
-# Prevent OOM. https://github.com/Facico/Chinese-Vicuna/issues/81
-model.cpp()
+if hasattr(model, 'cpp'):
+    # Prevent OOM. https://github.com/Facico/Chinese-Vicuna/issues/81
+    model.cpp()
 
 # unk. we want this to be different from the eos token, config
 tokenizer.pad_token_id = 0

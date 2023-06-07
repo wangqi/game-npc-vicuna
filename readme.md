@@ -28,6 +28,13 @@ cd game-npc-vicuna
 conda create -n gamenpc python=3.10
 conda activate gamenpc
 pip install -r ./requirements.txt
+# install gptq.llama
+pip install git+https://github.com/0cc4m/GPTQ-for-LLaMa@c884b421a233f9603d8224c9b22c2d83dd2c1fc4
+# check if bitsandbytes compiled with GPU support
+python -m bitsandbytes
+# find cuda home
+find / -name libcudart.so 2>/dev/null
+export CUDA_HOME=/usr/lib/x86_64-linux-gnu/
 ```
 
 ## 基础模型准备
@@ -39,8 +46,9 @@ pip install -r ./requirements.txt
 
 我选择wizard-mega-13b作为基础模型，合并以下中文权重
 
-1. [ziqingyang/chinese-llama-plus-lora-7b](https://huggingface.co/ziqingyang/chinese-llama-plus-lora-7b)
-2. [ziqingyang/chinese-alpaca-plus-lora-7b](https://huggingface.co/ziqingyang/chinese-alpaca-plus-lora-7b)
+1. [ziqingyang/chinese-llama-plus-lora-13b](https://huggingface.co/ziqingyang/chinese-llama-plus-lora-13b)
+2. [ziqingyang/chinese-alpaca-plus-lora-13b](https://huggingface.co/ziqingyang/chinese-alpaca-plus-lora-13b)
+3. [Chinese-Vicuna/Chinese-Vicuna-lora-13b-belle-and-guanaco](https://huggingface.co/Chinese-Vicuna/Chinese-Vicuna-lora-13b-belle-and-guanaco)
 
 下载基础模型
 
@@ -48,15 +56,17 @@ pip install -r ./requirements.txt
 ./down_model.sh openaccess-ai-collective/wizard-mega-13b
 ```
 
-执行以下脚本完成合并，合并后的模型存放于：`models/wizard-mega-13b_chinese` 目录中，并转换为ggml-f16格式，方便llama.cpp调用。
+执行以下脚本完成合并，合并后的模型存放于：`models/wizard-mega-13b_chinese` 目录中，并转换为ggml-q5_0.bin，方便llama.cpp调用。
 
 ```bash
-./merge_base.sh openaccess-ai-collective/wizard-mega-13b models/wizard-mega_chinese-13b
+./merge_base.sh openaccess-ai-collective/wizard-mega-13b models/wizard-mega_chinese-13b-plus
 ```
 
 使用llama.cpp测试模型效果
 
 ```bash
+# llama is precompiled in WSL2 ubuntu22. 
+# If you have different OS. Install the llama.cpp first.
 ./tools/llama -ins --color -m models/wizard-mega_chinese-13b/ggml-q5_0.bin --repeat_penalty 4
 ```
 
@@ -72,20 +82,29 @@ Below is an instruction that describes a task. Write a response that appropriate
 模型输出
 
 ```bash
-当然可以！中国最大的城市和政治中心是北京。作为一座拥有悠久历史的古都城池及现代都市的地方融合的城市——它有众多着名的历史遗迹、文化遗产以及美食特色等，
-吸引游客前来参观探索历史文化与现代化的一面镜子中的面貌。</s>
+> 当然可以！中国最大的城市和政治中心是北京。作为一座拥有悠久历史的古都城池及现代都市的地方融合的城市——它有众多着名的历史遗迹、文化遗> > 产以及美食特色等，
+> 吸引游客前来参观探索历史文化与现代化的一面镜子中的面貌。</s>
+```
+
+将生成的路径链接到models/game_npc_vicuna_base，以便于后续微调
+
+```bash
+rm models/game_npc_vicuna_base
+cd models
+ln -s wizard-mega_chinese-13b-plus game_npc_vicuna_base
+cd ..
 ```
 
 ## 微调步骤
 
-本项目 `data/data.json` 文件是游戏世界观的训练文件，此游戏是关于少女猎人在被龙兽毁灭的世界上冒险的故事。其中包含了60几名角色和数万字的对话数据。
+本项目 `data/data.json` 文件是游戏世界观的训练文件，此游戏是关于少女猎人在被龙兽毁灭的世界上冒险的故事，数据文件中包含了大约10K的训练数据。
 
 对项目微调的步骤如下：
 
 1. 使用`data/data.json`文件对合并后的模型进行微调
 
    ```bash
-   # fine tune on a 4 gpu p3.8xlarge machine.
+   # fine tune on a 4 A10 gpu g5.12xlarge machine.
    # change the GPU settings accordingly
    ./finetune.sh
    
@@ -93,27 +112,42 @@ Below is an instruction that describes a task. Write a response that appropriate
    ./finetune_single.sh
    ```
 
-   微调后的LoRA存放在`lora_out`目录下，可以拷贝到 `lora_out/huntress-7b`目录下保存
+   微调后的LoRA存放在`lora_out`目录下
 
 2. 将生成的LoRA权重与原版LLaMA模型合并，以便于模型推理和量化
    ```bash
    ./merge.sh [lora_path]
    ```
 
-   其中lora_path是可选参数，默认为 `lora_out/huntress-7b`
+   其中lora_path是可选参数，默认为 `lora_out/final`
 
-   合并后的模型保存在 `models/game_npc_vicuna_huntress`目录下。脚本将合并后的模型转换为ggml FP16格式。
+   合并后的模型保存在 `models/game_npc_vicuna_huntress`目录下。脚本将合并后的模型转换为ggml q5_0格式。
 
 3. 测试合并后的模型效果
    ```bash
-   ./tools/llama -ins --color -m models/game_npc_vicuna_huntress/ggml-f16.bin --repeat_penalty 4
-   
-   > 你是谁？
+   ./tools/llama -ins --color -m models/game_npc_vicuna_huntress/ggml-q5_0.bin --repeat_penalty 4
    ```
 
-   
+   输入测试
+
+   ```bash
+   Below is an instruction that describes a task. Write a response that appropriately completes the request. \
+   ### Instruction:  \
+   你是一个资深导游，你能介绍一下中国的首都吗? \
+   ### Output:
+   ```
 
 4. 【】
+
+## 聊天测试
+
+可以启动gradio的web界面，测试训练的系统对比ChatGPT4的性能
+
+```bash
+../chat_server_langchain.sh
+```
+
+
 
 ## 注意事项
 

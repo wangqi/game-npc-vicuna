@@ -1,15 +1,13 @@
-# Suitable for 8 GPUs
-TOT_CUDA="0,1,2,3,5,6,7"
+# Suitable for 4 GPUs
+TOT_CUDA="0,1,2,3"
 CUDAs=(${TOT_CUDA//,/ })
 echo "CUDAs: $CUDAs"
 CUDA_NUM=${#CUDAs[@]}
 PORT="12345"
 
-DATA_PATH="./data/data.json" #"../dataset/instruction/guanaco_non_chat_mini_52K-utf8.json"
+DATA_PATH="./data/data.json"
 OUTPUT_PATH="lora_out"
-#MODEL_PATH="decapoda-research/llama-7b-hf"
 MODEL_PATH="models/game_npc_vicuna_base"
-# lora_checkpoint="./checkpoints/chinese-vicuna-lora-7b-belle-and-guanaco"
 TEST_SIZE=0.3
 TOKENIZER_PATH="config/chinese_llama_alpaca/"
 
