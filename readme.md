@@ -12,10 +12,10 @@
 
 ## 项目说明
 
-本项目使用了一款网络游戏的世界观和文案设定，形成了10K的问题集，大约654K汉字量，去调优Vicuna模型，调优在单3090 GPU的机器上运营，因此选用了7B参数量的模型做基础。具体用到的模型如下：
+本项目使用了一款网络游戏的世界观和文案设定，形成了10K的问题集，并在已有成熟的中文开源模型基础上微调，调优在单3090 GPU的机器上运行，选用了13B参数量的模型做基础。具体用到的模型如下：
 
-1. [Chinese-LLaMA-Alpaca](https://github.com/ymcui/Chinese-LLaMA-Alpaca) 这是另一个优秀的中文LLaMA/Alpaca权重模型，在4月28日发布了7B的优化版本，参见：[民间版中文羊驼模型（Plus）v3.0](https://github.com/ymcui/Chinese-LLaMA-Alpaca/releases/tag/v3.0)
-2. [Chinese-Vicuna](https://github.com/Facico/Chinese-Vicuna) 这是一个优秀的中文低资源的llama+lora方案，本项目中的代码较多的参考了这个项目的脚本。
+1. [Chinese-LLaMA-Alpaca](https://github.com/ymcui/Chinese-LLaMA-Alpaca) 这是中文LLaMA/Alpaca权重模型，项目提供的tokenizer可以用于中文分词。
+2. [Chinese-Vicuna](https://github.com/Facico/Chinese-Vicuna) 这是一个中文低资源的llama+lora方案，本项目中的代码参考了这个项目的代码。
 
 ## 环境准备
 
@@ -32,24 +32,48 @@ pip install -r ./requirements.txt
 
 ## 基础模型准备
 
-首先制作中文的基础模型，我选择 [huggyllama/llama-7b](https://huggingface.co/huggyllama/llama-7b) 作为基础模型，合并以下中文权重
+首先制作基础LLaMA模型，通常有以下选项
+
+1. [yahma/llama-13b-hf](https://huggingface.co/yahma/llama-13b-hf)。这个模型修正了eos_token_id的问题
+2. [openaccess-ai-collective/wizard-mega-13b](https://huggingface.co/openaccess-ai-collective/wizard-mega-13b)。这个模型针对英文对话进行了优化。
+
+我选择wizard-mega-13b作为基础模型，合并以下中文权重
 
 1. [ziqingyang/chinese-llama-plus-lora-7b](https://huggingface.co/ziqingyang/chinese-llama-plus-lora-7b)
 2. [ziqingyang/chinese-alpaca-plus-lora-7b](https://huggingface.co/ziqingyang/chinese-alpaca-plus-lora-7b)
-3. [Facico/Chinese-Vicuna-lora-7b-3epoch-belle-and-guanaco](https://huggingface.co/Facico/Chinese-Vicuna-lora-7b-3epoch-belle-and-guanaco)
 
-执行以下脚本完成合并，合并后的模型存放于：`models/huggyllama_chinese-alpaca-plus-lora-7b-vicuna` 目录中，并转换为ggml-f16格式，方便llama.cpp调用。
+下载基础模型
 
 ```bash
-./merge_base.sh
+./down_model.sh openaccess-ai-collective/wizard-mega-13b
+```
+
+执行以下脚本完成合并，合并后的模型存放于：`models/wizard-mega-13b_chinese` 目录中，并转换为ggml-f16格式，方便llama.cpp调用。
+
+```bash
+./merge_base.sh openaccess-ai-collective/wizard-mega-13b models/wizard-mega_chinese-13b
 ```
 
 使用llama.cpp测试模型效果
 
 ```bash
-./tools/llama -ins --color -m models/huggyllama_chinese-alpaca-plus-lora-7b/ggml-f16.bin --repeat_penalty 4
+./tools/llama -ins --color -m models/wizard-mega_chinese-13b/ggml-q5_0.bin --repeat_penalty 4
+```
 
-> 你是一个资深导游，你能介绍一下中国的首都吗?
+输入以下问题进行测试
+
+```bash
+Below is an instruction that describes a task. Write a response that appropriately completes the request. \
+### Instruction:  \
+你是一个资深导游，你能介绍一下中国的首都吗? \
+### Output:
+```
+
+模型输出
+
+```bash
+当然可以！中国最大的城市和政治中心是北京。作为一座拥有悠久历史的古都城池及现代都市的地方融合的城市——它有众多着名的历史遗迹、文化遗产以及美食特色等，
+吸引游客前来参观探索历史文化与现代化的一面镜子中的面貌。</s>
 ```
 
 ## 微调步骤
