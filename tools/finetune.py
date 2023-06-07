@@ -2,6 +2,7 @@ import os
 import sys
 
 import torch
+import torch as torch
 import torch.nn as nn
 import bitsandbytes as bnb
 from datasets import load_dataset
@@ -112,10 +113,13 @@ tokenizer = LlamaTokenizer.from_pretrained(
 )
 
 print("load model from path:", args.model_path)
+max_memory=f'{int(torch.cuda.mem_get_info()[0]/1024**3)-2}GB'
+print("GPU max memory:", max_memory)
 model = LlamaForCausalLM.from_pretrained(
     args.model_path,
     load_in_8bit=True,
     device_map=device_map,
+    max_memory=max_memory
 )
 
 model = prepare_model_for_int8_training(model)
@@ -134,6 +138,9 @@ model = get_peft_model(model, config)
 if hasattr(model, 'cpp'):
     # Prevent OOM. https://github.com/Facico/Chinese-Vicuna/issues/81
     model.cpp()
+else:
+    print(type(model), "does not have cpp() method")
+    sys.exit(-1)
 
 # unk. we want this to be different from the eos token, config
 tokenizer.pad_token_id = 0
