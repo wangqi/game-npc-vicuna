@@ -24,13 +24,17 @@ from langchain.embeddings import OpenAIEmbeddings, LlamaCppEmbeddings, SentenceT
 from langchain import HuggingFacePipeline
 
 GGML_MODEL_PATH = "models/game_npc_vicuna_huntress/ggml-q4_1.bin"
-HF_MODEL_PATH = "models/wizard-mega_chinese-alpaca-plus-lora-13b"
+# HF_MODEL_PATH = "models/wizard-mega_chinese-alpaca-plus-lora-13b"
+HF_MODEL_PATH = "models/yahma_chinese-alpaca-plus-lora-13b"
 SENTENCE_EMBEDDING = "shibing624/text2vec-base-chinese"
 
 CHAT_MODEL = 'gpt-4'
 # CHAT_MODEL = 'gpt-3.5-turbo'
+FASTCHAT_MODEL = 'huntress'
+FASTCHAT_API_BASE="http://localhost:8000/v1"
 
-GGML_PROMPT_TPL = """假设你身处少女猎人的游戏世界,玩家被称为猎人队长,你是奥莉薇娅,请在虚拟世界中,用中文以第一人称和猎人队长聊天
+
+CHATGPT_TPL = """假设你身处少女猎人的游戏世界,玩家被称为猎人队长,你是奥莉薇娅,请用中文以第一人称回复猎人队长的问题,回答中不要跳出设定。
 背景信息:
 {background}
 聊天历史:
@@ -38,18 +42,19 @@ GGML_PROMPT_TPL = """假设你身处少女猎人的游戏世界,玩家被称为�
 [猎人队长]: {question}
 """
 
-MESSAGE_TPL = """假设你是游戏中的人物"奥莉薇娅",是塔鲁克公爵家的千金小姐.玩家是猎人队长.请参考背景信息,并始终模仿奥莉薇娅的语气回答问题,
-直接回复对话内容即可. 
+MESSAGE_TPL = """Below is an instruction that describes a task. Write a response that appropriately completes the request.
+### Instruction:
+假设你身处少女猎人的游戏世界,玩家被称为猎人队长,你是奥莉薇娅,请用中文以第一人称回复猎人队长的问题,回答中不要跳出设定。
 背景信息:
 {background}
 聊天历史:
 {chat_history}
-玩家问题:
-{question}
+[猎人队长]: {question}
+### Response:
 """
 
 # chat_prompt = PromptTemplate(input_variables=['background', 'question', 'chat_history'], template=MESSAGE_TPL)
-# ggml_prompt = PromptTemplate(input_variables=['background', 'question', 'chat_history'], template=GGML_PROMPT_TPL)
+# ggml_prompt = PromptTemplate(input_variables=['background', 'question', 'chat_history'], template=MESSAGE_TPL)
 
 openai_key = os.environ.get('$OPENAI_API_KEY')
 if openai_key is not None:
@@ -126,11 +131,14 @@ def load_chatgpt(temperature=0.7):
 
 def load_hf(model_path, temperature, token_context):
     llm = HuggingFacePipeline.from_model_id(model_id=model_path, task="text-generation",
-                                            model_kwargs={"temperature":temperature,
-                                                          "max_length":token_context,
-                                                          "load_in_8bit":True,
-                                                          "torch_dtype":torch.float16,
-                                                          "device_map":'cpu'})
+                                            model_kwargs={"temperature": temperature,
+                                                          "load_in_8bit": True,
+                                                          "max_length": 1024,
+                                                          "device_map": 'auto'})
+    return llm
+
+def load_fastchat(temperature=0.7):
+    llm = ChatOpenAI(temperature=temperature, model=FASTCHAT_MODEL, openai_api_base=FASTCHAT_API_BASE)
     return llm
 
 
@@ -144,25 +152,28 @@ def load_models(model_path, temperature=0.8, token_context=2048):
     if llm is None:
         # llm = load_ggml(model_path=model_path, temperature=temperature, token_context=token_context)
         llm = load_hf(model_path=model_path, temperature=temperature, token_context=token_context)
-        print("Load hf load model:", model_path)
+        print("Load HuggingFace local pipeline model:", model_path)
+        # llm = load_fastchat(temperature=temperature)
+        # print("Load FastChat API model:", FASTCHAT_API_BASE)
 
 
-def query_retriever(query, retriever, use_textwrap=True):
+def query_retriever(query, retriever, use_textwrap=True, max_tokens=200):
     # Load background docs if possible
     background_doc_list = retriever.get_relevant_documents(query=query)
     if len(background_doc_list) > 0:
         background = background_doc_list[0].page_content
+        if len(background) > max_tokens:
+            background = background[0:max_tokens]
         if use_textwrap:
             return "\n".join(textwrap.wrap(background, width=80))
         return background
     return ""
 
 
-def evaluate(inputs, history, prompt, enable_background, enable_history, **kwargs, ):
+def evaluate(query, history, prompt, enable_background, enable_history, **kwargs, ):
     global llm, chatgpt
 
     history = [] if history is None else history
-    print("history:", history)
     # Get the old input & output for displaying in the chatbot field
     return_ggml = []
     return_gpt = []
@@ -172,8 +183,13 @@ def evaluate(inputs, history, prompt, enable_background, enable_history, **kwarg
         old_chat_output = item['chat_output']
         return_ggml.append((old_input, old_ggml_output))
         return_gpt.append((old_input, old_chat_output))
-    print("return_ggml:", return_ggml)
-    print("return_gpt:", return_gpt)
+
+    ggml_history = '\n'.join(f'[猎人队长]{t[0]}\n[奥莉薇娅]{t[1]}' for t in return_ggml)
+    ggml_history = ggml_history[:-256]
+    chatgpt_history = '\n'.join(f'[猎人队长]{t[0]}\n[奥莉薇娅]{t[1]}' for t in return_gpt)
+    chatgpt_history = chatgpt_history[:-512]
+    print("ggml_history:", ggml_history)
+    print("chatgpt_history:", chatgpt_history)
 
     ggml_output = ""
     chat_output = ""
@@ -185,29 +201,53 @@ def evaluate(inputs, history, prompt, enable_background, enable_history, **kwarg
     if llm is not None:
         # llm is actually a llm_chain
         if enable_background:
-            background = query_retriever(query=inputs, retriever=ggml_retriever, use_textwrap=True)
-            if len(background) > 256:
-                background = background[:256]
+            background = query_retriever(query=query, retriever=ggml_retriever, use_textwrap=True, max_tokens=512)
         else:
+            print("ggml background is disabled")
             background = ""
-        llm_chain = LLMChain(prompt=chat_prompt, llm=llm)
         print("ggml background:", background)
-        ggml_output = llm_chain.run({"background": background, "chat_history": "", "question": [inputs]})
+
+        ggml_prompt = PromptTemplate(input_variables=['background', 'chat_history', 'question'],
+                                     template=MESSAGE_TPL)
+        llm_chain = LLMChain(prompt=ggml_prompt, llm=llm)
+        if not enable_history:
+            ggml_output = llm_chain({"background": background, "chat_history": "", "question": query},
+                                    return_only_outputs=True).get('text', '')
+        else:
+            ggml_output = llm_chain({"background": background, "chat_history": ggml_history, "question": query},
+                                    return_only_outputs=True).get('text', '')
+        output_lines = ggml_output.split("[猎人队长]:")
+        print("ggml output before replacing:", ggml_output)
+        for output_line in output_lines:
+            if "[奥莉薇娅]" in output_line:
+                ggml_output = ggml_output.replace("[奥莉薇娅]", "")
+            if ":" in ggml_output:
+                ggml_output = ggml_output.replace(":", "")
+            break
+        print("ggml output after replacing:", ggml_output)
     if chatgpt is not None:
         # Load background docs if possible
         if enable_background:
-            background = query_retriever(query=inputs, retriever=chatgpt_retriever, use_textwrap=True)
+            background = query_retriever(query=query, retriever=chatgpt_retriever, use_textwrap=True, max_tokens=1024)
         else:
             background = ""
         print("chatgpt background:", background)
-        chat_message = chat_prompt.format(background=background, question=inputs, chat_history="")
+        if not enable_history:
+            chat_message = chat_prompt.format(background=background, question=query, chat_history="")
+        else:
+            chat_message = chat_prompt.format(background=background, question=query, chat_history=chatgpt_history)
         result = chatgpt([HumanMessage(content=chat_message)])
         chat_output = result.content
+        if "[奥莉薇娅]" in chat_output:
+            chat_output = chat_output.replace("[奥莉薇娅]", "")
+        if ":" in ggml_output:
+            chat_output = chat_output.replace(":", "")
+        print("chatgpt output:", chat_output)
 
-    return_ggml.append((inputs, ggml_output))
-    return_gpt.append((inputs, chat_output))
+    return_ggml.append((query, ggml_output))
+    return_gpt.append((query, chat_output))
 
-    history.append({"input": inputs, "ggml_output": ggml_output, "chat_output": chat_output})
+    history.append({"input": query, "ggml_output": ggml_output, "chat_output": chat_output})
 
     yield return_ggml, return_gpt, history
 
@@ -220,7 +260,7 @@ with gr.Blocks() as demo:
     with gr.Row().style(equal_height=False):
         with gr.Column(variant="panel"):
             with gr.Row():
-                gr_model_path = gr.Label(HF_MODEL_PATH.replace("models/", "")[0:8])
+                gr_model_path = gr.Label("自训练模型(13B)")
                 if openai_key is not None:
                     if CHAT_MODEL == "gpt-3.5-turbo":
                         gr_chat_gpt = gr.Label("ChatGPT 3.5", caption=openai_key)
@@ -234,17 +274,12 @@ with gr.Blocks() as demo:
 
             with gr.Row():
                 gr_prompt_input = gr.components.Textbox(
-                    lines=4, label="Prompt", placeholder="", value="""假设你是游戏中的人物"奥莉薇娅",是塔鲁克公爵家的千金小姐.玩家是猎人队长.请参考背景信息,并始终模仿奥莉薇娅的语气回答问题,直接回复对话内容即可.
-背景信息:
-{background}
-聊天历史:
-{chat_history}
-[猎人队长]: {question}"""
+                    lines=4, label="Prompt", placeholder="", value=MESSAGE_TPL
                 )
 
             with gr.Row():
-                gr_enable_background_checkbox = gr.Checkbox(label="启用背景", value=True)
-                gr_enable_history_checkbox = gr.Checkbox(label="启用历史", value=False)
+                gr_enable_background_checkbox = gr.Checkbox(label="启用故事背景", value=True)
+                gr_enable_history_checkbox = gr.Checkbox(label="启用聊天历史", value=True)
 
             with gr.Row():
                 with gr.Column():
@@ -264,7 +299,8 @@ with gr.Blocks() as demo:
                 clear_history = gr.Button("清除历史")
 
         with gr.Column(variant="panel"):
-            gr_ggml_title = gr.Markdown("## Local Model")
+            # gr_ggml_title = gr.Markdown("## " + HF_MODEL_PATH.split("/")[-1][0:20])
+            gr_ggml_title = gr.Markdown("## " + "130亿参数本地模型")
             ggml_chatbot = gr.Chatbot(label="ggml").style(height=1024)
             csv_flagged_components.append(ggml_chatbot)
             output_components = [ggml_chatbot]

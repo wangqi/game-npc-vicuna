@@ -49,7 +49,7 @@ GRADIENT_ACCUMULATION_STEPS = BATCH_SIZE // MICRO_BATCH_SIZE
 EPOCHS = args.num_epochs
 #  learning rates of 2e-4, 1e-4, and 5e-5 for the 7B, 13B and 30B models, respectively
 LEARNING_RATE = 1e-4
-CUTOFF_LEN = 512 #256 accounts for about 96% of the data
+CUTOFF_LEN = 2048 # 13B need about 18G(the cutoff_len can be set to 2048 in 3090Ti/4090Ti)
 # LORA_R is the rank of the low-rank adaptation in the LoRA technique.
 # It determines the size of the low-rank matrix used in the adaptation.
 # A lower rank means a smaller matrix, which requires fewer parameters
@@ -131,6 +131,9 @@ config = LoraConfig(
 config.save_pretrained(OUTPUT_DIR)
 
 model = get_peft_model(model, config)
+# Prevent OOM. https://github.com/Facico/Chinese-Vicuna/issues/81
+model.cpp()
+
 # unk. we want this to be different from the eos token, config
 tokenizer.pad_token_id = 0
 # tokenizer.padding_side = "left"  # Allow batched inference
