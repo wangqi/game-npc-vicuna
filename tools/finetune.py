@@ -139,8 +139,8 @@ if hasattr(model, 'cpp'):
     # Prevent OOM. https://github.com/Facico/Chinese-Vicuna/issues/81
     model.cpp()
 else:
-    print(type(model), "does not have cpp() method")
-    sys.exit(-1)
+    print("WARNING:", type(model), "does not have cpp() method")
+    # sys.exit(-1)
 
 # unk. we want this to be different from the eos token, config
 tokenizer.pad_token_id = 0
