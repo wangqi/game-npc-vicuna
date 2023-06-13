@@ -67,7 +67,7 @@ export CUDA_HOME=/usr/lib/x86_64-linux-gnu/
 ```bash
 # llama is precompiled in WSL2 ubuntu22. 
 # If you have different OS. Install the llama.cpp first.
-./tools/llama -ins --color -m models/wizard-mega_chinese-13b/ggml-q5_0.bin --repeat_penalty 4
+./tools/llama -ins --color -m models/wizard-mega_chinese-13b-plus/ggml-q5_0.bin --repeat_penalty 4
 ```
 
 输入以下问题进行测试

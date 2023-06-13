@@ -153,7 +153,6 @@ if hasattr(model, 'cpp'):
     model.cpp()
 else:
     print("WARNING:", type(model), "does not have cpp() method")
-    # sys.exit(-1)
 
 # unk. we want this to be different from the eos token, config
 tokenizer.pad_token_id = 0
